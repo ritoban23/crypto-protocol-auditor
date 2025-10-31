@@ -367,17 +367,49 @@ Hybrid search combines:
 
 ---
 
-### 9. Next Steps
+### 9. Live Data Integration (In Progress)
 
-1. **Add Hybrid Search** (current task)
-   - Add UI toggle for search modes
-   - Update API route
-   - Test with various query types
+**What is Live Data Integration?**
+Combines static KB search with live market data:
+- User: "What is Bitcoin's price and consensus?"
+- App returns: KB results (protocol info) + live prices
+- User gets: Complete picture of both technical and market aspects
 
-2. **Live Data Integration**
-   - Create agent for crypto price lookup
-   - Integrate CoinGecko or similar API
+**Architecture:**
+1. **Price API** (`/app/api/prices/route.ts`): Fetches from CoinGecko
+2. **Frontend Integration**: Detects projects in query, fetches prices
+3. **Caching Strategy**: 5-minute TTL to prevent rate limiting
+4. **Combined Results**: Shows KB results + price data together
 
-3. **Performance Evaluation**
+**Implementation Status:**
+- ✅ Price API route created and tested
+- ✅ CoinGecko integration with 12+ cryptocurrencies
+- ✅ Caching mechanism implemented
+- ✅ Architecture documentation complete
+- 🟡 Frontend integration (in your hands)
+- 🟡 Testing (next step)
+
+**Next Actions:**
+1. Choose implementation path (Quick: 1h vs Learning: 2-3h)
+2. Follow `FRONTEND_IMPLEMENTATION_GUIDE.md`
+3. Test with combined queries
+4. Commit changes
+
+---
+
+### 10. Next Steps
+
+1. **Live Data Integration - Frontend** (current task)
+   - Integrate price data into search UI
+   - Test with various queries
+   - Commit implementation
+
+2. **Advanced Filtering** (Phase 3)
+   - Filter by project_id
+   - Filter by date range
+   - Filter by category
+
+3. **Performance Evaluation** (Phase 3)
    - Use `EVALUATE KNOWLEDGE_BASE` metrics
-   - Track MRR (Mean Reciprocal Rank), Hit@k scores
+   - Track MRR, Hit@k scores
+   - Optimize search quality

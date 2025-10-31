@@ -2,69 +2,71 @@
 
 import { useState } from 'react';
 
-// API Response type - metadata is a JSON object from MindsDB
+// Agent API Response types
 type SearchResult = {
+  content: string;
+  relevance: number;
   metadata: {
     _source?: string;
     category?: string;
-    project_id?: string;
-    project_name?: string;
-    source_file?: string;
-    _chunk_index?: number;
-    _original_doc_id?: string;
-    _start_char?: number;
-    _end_char?: number;
-    _created_at?: string;
-    _updated_at?: string;
-    _original_row_index?: string;
-    _content_column?: string;
     [key: string]: any;
   };
-  relevance: number;
-  searchMode?: 'semantic' | 'keyword' | 'hybrid';
+  source: string;
+  searchMode?: string;
 };
 
-type SearchMode = 'semantic' | 'keyword' | 'hybrid';
+type PriceResult = {
+  project: string;
+  price_usd: number;
+  market_cap_usd: number;
+  volume_24h_usd: number;
+  price_change_24h: number;
+  price_change_7d: number;
+  last_updated: string;
+};
+
+type AgentResponse = {
+  queryId: string;
+  originalQuery: string;
+  classifiedAs: 'kb_only' | 'price_only' | 'combined' | 'auto';
+  results: {
+    kb_results?: SearchResult[];
+    price_results?: PriceResult[];
+    kbSearchComplete: boolean;
+    priceSearchComplete: boolean;
+  };
+  executedAt: {
+    kb_search_ms: number;
+    price_fetch_ms: number;
+    total_ms: number;
+  };
+  agentReasoning: string;
+};
 
 export default function Home() {
   const [question, setQuestion] = useState('');
-  const [searchMode, setSearchMode] = useState<SearchMode>('hybrid');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [agentResponse, setAgentResponse] = useState<AgentResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Detect query type and suggest adaptive alpha
-  const getAdaptiveAlpha = (query: string): number => {
-    // Patterns that benefit from keyword search
-    const hasAcronyms = /[A-Z]{2,}|BTC|ETH|POW|PoW|PoS/i.test(query);
-    const hasNumbers = /\d{3,}/.test(query);
-    const hasSpecificTerms = /whitepaper|consensus|algorithm|protocol/i.test(query);
-    
-    if (hasAcronyms || hasNumbers) {
-      return 0.3; // Favor keyword matching for IDs/acronyms
-    } else if (hasSpecificTerms) {
-      return 0.7; // Favor semantic matching for conceptual terms
-    }
-    return 0.5; // Balanced for mixed queries
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    setResults([]);
+    setAgentResponse(null);
 
     try {
-      const alpha = getAdaptiveAlpha(question);
-      const response = await fetch('/api/search', {
+      const response = await fetch('/api/agent/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          question,
-          searchMode,
-          alpha, // Send adaptive alpha to backend
+          query: question,
+          context: {
+            searchMode: 'auto', // Let agent decide
+            maxResults: 5,
+          }
         }),
       });
 
@@ -73,12 +75,9 @@ export default function Home() {
         throw new Error(err.error || 'Failed to fetch results');
       }
 
-      const data = await response.json();
-      console.log('API Response Data:', data);
-      if (data.length > 0) {
-        console.log('First result:', JSON.stringify(data[0], null, 2));
-      }
-      setResults(data);
+      const data: AgentResponse = await response.json();
+      console.log('Agent Response:', data);
+      setAgentResponse(data);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -109,33 +108,11 @@ export default function Home() {
             <div className="relative group">
               <div className="absolute -inset-1 bg-linear-to-r from-blue-600 to-cyan-600 rounded-xl blur opacity-25 group-hover:opacity-75 transition duration-1000"></div>
               <div className="relative bg-slate-800 rounded-xl p-6">
-                {/* Search Mode Selector */}
-                <div className="mb-4 flex gap-2 flex-wrap">
-                  <label className="text-sm text-slate-300 font-semibold self-center">Search Mode:</label>
-                  {(['semantic', 'keyword', 'hybrid'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setSearchMode(mode)}
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
-                        searchMode === mode
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                    >
-                      {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                      {mode === 'semantic' && ' 🧠'}
-                      {mode === 'keyword' && ' 🔤'}
-                      {mode === 'hybrid' && ' 🔀'}
-                    </button>
-                  ))}
-                </div>
-
                 <input
                   type="text"
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
-                  placeholder="Ask anything about crypto protocols... e.g., How does Bitcoin's proof-of-work function?"
+                  placeholder="Ask anything about crypto protocols or prices... e.g., What is Bitcoin's proof-of-work? What is Ethereum's price?"
                   className="w-full bg-slate-700 text-white placeholder-slate-400 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
                 />
                 <button
@@ -146,7 +123,7 @@ export default function Home() {
                   {isLoading ? (
                     <>
                       <span className="inline-block animate-spin">⚙️</span>
-                      Auditing Knowledge Base...
+                      Agent Processing...
                     </>
                   ) : (
                     <>
@@ -168,117 +145,168 @@ export default function Home() {
           </div>
         )}
 
-        {/* Results Section */}
-        {results.length > 0 && (
-          <div>
-            <div className="mb-6 flex items-center gap-2">
-              <span className="text-2xl">📊</span>
-              <h2 className="text-2xl font-bold">
-                Results
-                <span className="text-cyan-400 ml-2">({results.length})</span>
-              </h2>
-              {results.length > 0 && (
-                <span className="text-sm text-slate-400 ml-4">
-                  Using: <span className="text-cyan-300 font-semibold">{results[0]?.searchMode || searchMode}</span> search
-                </span>
+        {/* Agent Info Banner */}
+        {agentResponse && (
+          <div className="mb-6 bg-linear-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/50 rounded-lg p-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-2xl">🤖</span>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-semibold text-slate-300">Query Classification:</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    agentResponse.classifiedAs === 'kb_only' ? 'bg-purple-600 text-white' :
+                    agentResponse.classifiedAs === 'price_only' ? 'bg-green-600 text-white' :
+                    agentResponse.classifiedAs === 'combined' ? 'bg-blue-600 text-white' :
+                    'bg-gray-600 text-white'
+                  }`}>
+                    {agentResponse.classifiedAs === 'kb_only' && '📚 Knowledge Base'}
+                    {agentResponse.classifiedAs === 'price_only' && '💰 Live Prices'}
+                    {agentResponse.classifiedAs === 'combined' && '🔀 Combined Search'}
+                    {agentResponse.classifiedAs === 'auto' && '🔍 Auto'}
+                  </span>
+                </div>
+                {agentResponse.agentReasoning && (
+                  <p className="text-sm text-slate-400">{agentResponse.agentReasoning}</p>
+                )}
+              </div>
+              {agentResponse.executedAt && (
+                <div className="text-xs text-slate-500">
+                  <div>KB: {agentResponse.executedAt.kb_search_ms}ms</div>
+                  <div>Prices: {agentResponse.executedAt.price_fetch_ms}ms</div>
+                  <div>Total: {agentResponse.executedAt.total_ms}ms</div>
+                </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Knowledge Base Results Section */}
+        {agentResponse?.results.kb_results && agentResponse.results.kb_results.length > 0 && (
+          <div className="mb-8">
+            <div className="mb-6 flex items-center gap-2">
+              <span className="text-2xl">📚</span>
+              <h2 className="text-2xl font-bold">
+                Knowledge Base Results
+                <span className="text-cyan-400 ml-2">({agentResponse.results.kb_results.length})</span>
+              </h2>
             </div>
 
             <div className="grid gap-4">
-              {results.map((result, index) => {
-                // Parse metadata object from MindsDB response
-                const meta = result.metadata;
-                
-                // Extract source file
-                const sourceText = meta?.source_file || meta?._original_doc_id || "Unknown Source";
-                
-                // Extract project info
-                const projectName = meta?.project_name || meta?.project_id || "Unknown Project";
-                
-                // Extract category
-                const category = meta?.category || "N/A";
-                
-                // Extract chunk index
-                const chunkIndex = meta?._chunk_index !== undefined ? meta._chunk_index : null;
-                
-                // Calculate relevance percentage
-                const relevancePercent = (result.relevance * 100).toFixed(1);
-                const relevanceColor = 
-                  result.relevance > 0.8 ? 'from-green-500 to-emerald-500' :
-                  result.relevance > 0.7 ? 'from-blue-500 to-cyan-500' :
-                  'from-yellow-500 to-orange-500';
-
-                return (
-                  <div
-                    key={index}
-                    className="group relative bg-slate-800 border border-slate-700 hover:border-cyan-500/50 rounded-lg p-6 transition duration-300 hover:shadow-xl hover:shadow-cyan-500/10"
-                  >
-                    {/* Search Mode Badge */}
-                    <div className={`absolute top-4 left-4 text-xs font-semibold px-2 py-1 rounded-full ${
-                      result.searchMode === 'semantic' ? 'bg-purple-900/50 text-purple-200' :
-                      result.searchMode === 'keyword' ? 'bg-orange-900/50 text-orange-200' :
-                      'bg-blue-900/50 text-blue-200'
-                    }`}>
-                      {result.searchMode === 'semantic' && '🧠 Semantic'}
-                      {result.searchMode === 'keyword' && '🔤 Keyword'}
-                      {result.searchMode === 'hybrid' && '🔀 Hybrid'}
+              {agentResponse.results.kb_results.map((result, index) => (
+                <div
+                  key={index}
+                  className="group relative bg-slate-800 border border-slate-700 hover:border-purple-500/50 rounded-lg p-6 transition duration-300 hover:shadow-xl hover:shadow-purple-500/10"
+                >
+                  <div className="flex items-start gap-4">
+                    <span className="text-3xl">🤖</span>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-white mb-3">AI Agent Response</h3>
+                      <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{result.content}</p>
                     </div>
-
-                    {/* Relevance Badge */}
-                    <div className={`absolute top-4 right-4 bg-linear-to-r ${relevanceColor} text-white text-sm font-bold px-3 py-1 rounded-full`}>
-                      {relevancePercent}%
-                    </div>
-
-                    {/* Result Number & Project */}
-                    <div className="mb-4 pr-40 pt-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-cyan-400 text-lg font-bold">#{index + 1}</span>
-                        <h3 className="text-xl font-bold text-white">{projectName}</h3>
+                  </div>
+                  
+                  {result.relevance && (
+                    <div className="mt-4 pt-4 border-t border-slate-700">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400">Relevance:</span>
+                        <div className="flex-1 bg-slate-700 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className={`h-full bg-linear-to-r ${
+                              result.relevance > 0.8 ? 'from-green-500 to-emerald-500' :
+                              result.relevance > 0.6 ? 'from-blue-500 to-cyan-500' :
+                              'from-yellow-500 to-orange-500'
+                            }`}
+                            style={{ width: `${result.relevance * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs font-bold text-cyan-400">{(result.relevance * 100).toFixed(1)}%</span>
                       </div>
                     </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-                    {/* Metadata Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      {/* Source */}
-                      <div className="bg-slate-700/50 rounded-lg p-3 border border-slate-600">
-                        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">📄 Source</p>
-                        <p className="text-white font-mono text-sm truncate">{sourceText}</p>
-                      </div>
+        {/* Price Results Section */}
+        {agentResponse?.results.price_results && agentResponse.results.price_results.length > 0 && (
+          <div className="mb-8">
+            <div className="mb-6 flex items-center gap-2">
+              <span className="text-2xl">💰</span>
+              <h2 className="text-2xl font-bold">
+                Live Price Data
+                <span className="text-cyan-400 ml-2">({agentResponse.results.price_results.length})</span>
+              </h2>
+              <span className="text-xs text-slate-400 ml-2">
+                Source: CoinGecko API
+              </span>
+            </div>
 
-                      {/* Category */}
-                      <div className="bg-slate-700/50 rounded-lg p-3 border border-slate-600">
-                        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">🏷️ Category</p>
-                        <p className="text-white font-mono text-sm">{category}</p>
-                      </div>
-                    </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {agentResponse.results.price_results.map((price, index) => (
+                <div
+                  key={index}
+                  className="group relative bg-linear-to-br from-slate-800 to-slate-900 border border-slate-700 hover:border-green-500/50 rounded-lg p-6 transition duration-300 hover:shadow-xl hover:shadow-green-500/10"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-white capitalize">{price.project}</h3>
+                    {price.price_change_24h !== undefined && (
+                      <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                        price.price_change_24h >= 0 ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                      }`}>
+                        {price.price_change_24h >= 0 ? '↑' : '↓'} {Math.abs(price.price_change_24h).toFixed(2)}%
+                      </span>
+                    )}
+                  </div>
 
-                    {/* Chunk Index */}
-                    {chunkIndex !== null && (
-                      <div className="bg-slate-700/50 rounded-lg p-3 border border-slate-600">
-                        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">🔗 Chunk Index</p>
-                        <p className="text-white font-mono text-sm">{chunkIndex}</p>
+                  <div className="space-y-3">
+                    {price.price_usd !== undefined && (
+                      <div className="bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-slate-400 text-xs font-semibold uppercase mb-1">💵 Price (USD)</p>
+                        <p className="text-2xl font-bold text-green-400">${price.price_usd.toLocaleString()}</p>
                       </div>
                     )}
 
-                    {/* Metadata Details */}
-                    {meta?._original_row_index && (
-                      <div className="mt-4 text-xs text-slate-400 border-t border-slate-700 pt-3">
-                        <p>Row Index: <span className="text-cyan-400">{meta._original_row_index}</span></p>
+                    {price.market_cap_usd !== undefined && (
+                      <div className="bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-slate-400 text-xs font-semibold uppercase mb-1">📊 Market Cap</p>
+                        <p className="text-sm font-mono text-white">${(price.market_cap_usd / 1e9).toFixed(2)}B</p>
                       </div>
                     )}
                   </div>
-                );
-              })}
+
+                  {price.last_updated && (
+                    <div className="mt-3 pt-3 border-t border-slate-700 text-xs text-slate-500">
+                      Updated: {new Date(price.last_updated).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
 
         {/* Empty State */}
-        {!isLoading && results.length === 0 && !error && (
+        {!isLoading && !agentResponse && !error && (
           <div className="text-center py-16">
             <span className="text-6xl mb-4 block">🔍</span>
             <h3 className="text-xl font-semibold text-slate-300 mb-2">Start Your Search</h3>
-            <p className="text-slate-400">Ask a question about cryptocurrency protocols, blockchain technology, or any crypto-related topic.</p>
+            <p className="text-slate-400">Ask about crypto protocols, request live prices, or combine both!</p>
+            <div className="mt-6 grid md:grid-cols-3 gap-4 max-w-3xl mx-auto text-left">
+              <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+                <p className="text-sm text-cyan-400 font-semibold mb-2">📚 Knowledge Base</p>
+                <p className="text-xs text-slate-400">&quot;How does Bitcoin proof-of-work function?&quot;</p>
+              </div>
+              <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+                <p className="text-sm text-green-400 font-semibold mb-2">💰 Live Prices</p>
+                <p className="text-xs text-slate-400">&quot;What is Ethereum&apos;s current price?&quot;</p>
+              </div>
+              <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+                <p className="text-sm text-blue-400 font-semibold mb-2">🔀 Combined</p>
+                <p className="text-xs text-slate-400">&quot;Tell me about Bitcoin and its price&quot;</p>
+              </div>
+            </div>
           </div>
         )}
       </div>

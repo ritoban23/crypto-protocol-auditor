@@ -99,6 +99,18 @@ function classifyQuery(query: string): {
     'proof of work',
     'proof of stake',
     'Byzantine',
+    'technology',
+    'technical',
+    'how does',
+    'how it works',
+    'explain',
+    'works',
+    'function',
+    'implementation',
+    'design',
+    'architecture',
+    'development',
+    'infrastructure',
   ];
 
   // Crypto project names and symbols
@@ -125,6 +137,26 @@ function classifyQuery(query: string): {
     arb: 'arbitrum',
     optimism: 'optimism',
     op: 'optimism',
+    avalanche: 'avalanche',
+    avax: 'avalanche',
+    cosmos: 'cosmos',
+    atom: 'cosmos',
+    near: 'near',
+    tron: 'tron',
+    trx: 'tron',
+    chainlink: 'chainlink',
+    link: 'chainlink',
+    uniswap: 'uniswap',
+    uni: 'uniswap',
+    aave: 'aave',
+    curve: 'curve',
+    crv: 'curve',
+    yearn: 'yearn-finance',
+    yfi: 'yearn-finance',
+    monero: 'monero',
+    xmr: 'monero',
+    zcash: 'zcash',
+    zec: 'zcash',
   };
 
   // Detect projects mentioned in query
@@ -191,49 +223,142 @@ function classifyQuery(query: string): {
 
 async function executeKBSearch(
   query: string,
+  detectedProjects: string[] = [],
   maxResults: number = 5
 ): Promise<{ results: KBResult[]; duration: number }> {
   const startTime = Date.now();
 
   try {
-    // Use MindsDB Agent instead of direct KB query
-    console.log(`[KB Search] Querying MindsDB agent with: "${query}"`);
+    console.log(`[KB Search] Querying for: "${query}"`);
+    console.log(`[KB Search] Detected projects: ${detectedProjects.join(', ') || 'none'}`);
     
-    // MindsDB HTTP API is on port 47334, not 47335 (47335 is SQL wire protocol)
+    // If we have detected projects, try direct KB query first
+    if (detectedProjects.length > 0) {
+      const project = detectedProjects[0].toLowerCase();
+      console.log(`[KB Search] Attempting direct KB query for project: ${project}`);
+      
+      try {
+        const directResponse = await fetch('http://127.0.0.1:47334/api/sql/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `SELECT chunk_content, project_id, category, source_file FROM mindsdb.web3_kb WHERE project_id = '${project}' LIMIT ${maxResults};`
+          }),
+        });
+
+        if (directResponse.ok) {
+          const directData = await directResponse.json();
+          console.log(`[KB Search] Direct KB query returned ${directData.data?.length || 0} chunks`);
+          
+          if (directData.data && directData.data.length > 0) {
+            // Combine chunks into a single comprehensive answer
+            const chunks = directData.data.map((row: any) => row[0]).filter((c: string) => c && c.length > 50);
+            
+            if (chunks.length > 0) {
+              // Combine first few chunks to create a comprehensive answer
+              const combinedContent = chunks.slice(0, 3).join('\n\n');
+              const duration = Date.now() - startTime;
+              
+              console.log(`[KB Search] Returning ${chunks.length} KB chunks (${combinedContent.length} chars) in ${duration}ms`);
+              
+              return {
+                results: [{
+                  content: combinedContent,
+                  relevance: 1.0,
+                  metadata: {
+                    _source: directData.data[0][3] || 'Knowledge Base',
+                    category: directData.data[0][2] || 'document',
+                  },
+                  source: 'Knowledge Base',
+                  searchMode: 'direct',
+                }],
+                duration
+              };
+            }
+          }
+        }
+      } catch (directError) {
+        console.warn(`[KB Search] Direct KB query failed:`, directError);
+        // Fall through to agent query
+      }
+    }
+    
+    // Fall back to MindsDB Agent query
+    console.log(`[KB Search] Using MindsDB agent`);
+    
+    // Remove price-related keywords
+    const technicalQuery = query
+      .replace(/current\s+market\s+price/gi, 'technical specifications')
+      .replace(/market\s+price/gi, 'technical specifications')
+      .replace(/price\s+(of|for)/gi, 'technical specifications of')
+      .replace(/what['^]s\s+the\s+price/gi, 'describe the technical architecture');
+    
+    // Extract project name
+    let project = 'the project';
+    if (detectedProjects.length > 0) {
+      project = detectedProjects[0].charAt(0).toUpperCase() + detectedProjects[0].slice(1);
+    } else {
+      const projectMatch = technicalQuery.match(/(?:about|tell me|explain|what is|describe)\s+([a-z\s]+?)(?:\?|and|'s|technology|technical|$)/i);
+      project = projectMatch ? projectMatch[1].trim() : 'the project';
+    }
+    
+    const enhancedQuery = `Provide comprehensive and detailed technical information about ${project} specifically.
+
+IMPORTANT: Search the knowledge base for information about ${project} (not other projects).
+
+Include ALL available information for ${project}:
+1. Complete technical description and purpose
+2. Technical architecture and system design
+3. Consensus mechanism and validation process
+4. Fee structure, tokenomics, and economic model
+5. Key features and innovations
+6. Security model and considerations
+
+Be comprehensive:`;
+    
     const response = await fetch('http://127.0.0.1:47334/api/sql/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        query: `SELECT answer FROM crypto_auditor_agent WHERE question = '${query.replace(/'/g, "''")}'`
+        query: `SELECT answer FROM crypto_auditor_agent WHERE question = '${enhancedQuery.replace(/'/g, "''")}'`
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[KB Search] MindsDB agent query failed: ${response.statusText}`);
-      console.error(`[KB Search] Error response:`, errorText);
       throw new Error(`MindsDB agent query failed: ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log(`[KB Search] MindsDB raw response:`, JSON.stringify(data, null, 2));
     
-    // Check if we got data
     if (!data.data || data.data.length === 0) {
-      console.warn(`[KB Search] No data in response from MindsDB agent`);
+      console.warn(`[KB Search] No data from agent`);
       return { results: [], duration: Date.now() - startTime };
     }
     
-    // MindsDB returns data as array of arrays: data[0][0] is the first row, first column
-    const answer = data.data[0]?.[0] || '';
+    // Handle response format
+    let answer = '';
+    if (Array.isArray(data.data[0])) {
+      answer = data.data[0][0] || '';
+    } else {
+      answer = String(data.data[0]) || '';
+    }
+    
     console.log(`[KB Search] Agent answer length: ${answer.length} chars`);
+    console.log(`[KB Search] First 200 chars: ${answer.substring(0, 200)}`);
     
-    if (!answer) {
-      console.warn(`[KB Search] Answer field is empty`);
+    // Filter out tool_code responses or very short answers
+    if (answer.includes('tool_code') || answer.includes('kb_query_tool')) {
+      console.warn(`[KB Search] Agent returned tool_code response`);
       return { results: [], duration: Date.now() - startTime };
     }
-
-    // Convert agent's answer into KB result format
+    
+    if (answer.length < 50) {
+      console.warn(`[KB Search] Agent returned too-short response (${answer.length} chars)`);
+      return { results: [], duration: Date.now() - startTime };
+    }
+    
     const results: KBResult[] = [{
       content: answer,
       relevance: 1.0,
@@ -246,7 +371,7 @@ async function executeKBSearch(
     }];
 
     const duration = Date.now() - startTime;
-    console.log(`[KB Search] Agent responded in ${duration}ms`);
+    console.log(`[KB Search] Successfully returned answer (${answer.length} chars) in ${duration}ms`);
     return { results, duration };
   } catch (error) {
     console.error('[KB Search Error]:', error);
@@ -361,7 +486,7 @@ export async function POST(request: NextRequest) {
 
     // Execute in parallel for speed
     const [kbResult, priceResult] = await Promise.all([
-      executeKB ? executeKBSearch(query, maxResults) : Promise.resolve({ results: [], duration: 0 }),
+      executeKB ? executeKBSearch(query, classification.detectedProjects, maxResults) : Promise.resolve({ results: [], duration: 0 }),
       executePrice ? executePriceFetch(classification.detectedProjects) : Promise.resolve({ results: [], duration: 0 }),
     ]);
 

@@ -5,6 +5,14 @@ interface QueryContext {
   searchMode?: 'auto' | 'kb_only' | 'price_only' | 'combined';
   maxResults?: number;
   timeout?: number;
+  filters?: {
+    category?: string; // Filter by document category (whitepaper, technical-doc, etc.)
+    projects?: string[]; // Filter to specific projects
+    dateRange?: {
+      start?: string;
+      end?: string;
+    };
+  };
 }
 
 interface KBResult {
@@ -224,25 +232,42 @@ function classifyQuery(query: string): {
 async function executeKBSearch(
   query: string,
   detectedProjects: string[] = [],
-  maxResults: number = 5
+  maxResults: number = 5,
+  filters?: QueryContext['filters']
 ): Promise<{ results: KBResult[]; duration: number }> {
   const startTime = Date.now();
 
   try {
     console.log(`[KB Search] Querying for: "${query}"`);
     console.log(`[KB Search] Detected projects: ${detectedProjects.join(', ') || 'none'}`);
+    console.log(`[KB Search] Filters:`, filters);
     
-    // If we have detected projects, try direct KB query first
-    if (detectedProjects.length > 0) {
-      const project = detectedProjects[0].toLowerCase();
-      console.log(`[KB Search] Attempting direct KB query for project: ${project}`);
+    // Build WHERE clause based on filters
+    const whereConditions: string[] = [];
+    
+    // Project filter (either from detection or explicit filter)
+    const projectsToFilter = filters?.projects || detectedProjects;
+    if (projectsToFilter.length > 0) {
+      const project = projectsToFilter[0].toLowerCase();
+      whereConditions.push(`project_id = '${project}'`);
+    }
+    
+    // Category filter
+    if (filters?.category) {
+      whereConditions.push(`category = '${filters.category}'`);
+    }
+    
+    // If we have filters or detected projects, try direct KB query first
+    if (whereConditions.length > 0) {
+      const whereClause = whereConditions.join(' AND ');
+      console.log(`[KB Search] Attempting direct KB query with filters: ${whereClause}`);
       
       try {
         const directResponse = await fetch('http://127.0.0.1:47334/api/sql/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            query: `SELECT chunk_content, project_id, category, source_file FROM mindsdb.web3_kb WHERE project_id = '${project}' LIMIT ${maxResults};`
+            query: `SELECT chunk_content, project_id, category, source_file FROM mindsdb.web3_kb WHERE ${whereClause} LIMIT ${maxResults};`
           }),
         });
 
@@ -486,7 +511,7 @@ export async function POST(request: NextRequest) {
 
     // Execute in parallel for speed
     const [kbResult, priceResult] = await Promise.all([
-      executeKB ? executeKBSearch(query, classification.detectedProjects, maxResults) : Promise.resolve({ results: [], duration: 0 }),
+      executeKB ? executeKBSearch(query, classification.detectedProjects, maxResults, context.filters) : Promise.resolve({ results: [], duration: 0 }),
       executePrice ? executePriceFetch(classification.detectedProjects) : Promise.resolve({ results: [], duration: 0 }),
     ]);
 

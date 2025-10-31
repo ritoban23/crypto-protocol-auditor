@@ -5,10 +5,19 @@ Built with Next.js, MindsDB, and modern fintech design.
 
 ---
 
+## ⚠️ Security Notice
+
+**API Keys require secure configuration.** See [SECURITY.md](./SECURITY.md) for details.
+
+This project uses environment variables (`.env`) to manage secrets safely. Never commit API keys to Git.
+
+---
+
 ## 📚 Documentation Quick Links
 
-- **[QUICK_START.md](./QUICK_START.md)** - Get running in 5 minutes
+- **[QUICK_START.md](./QUICK_START.md)** - Get running in 5 minutes (includes API key setup)
 - **[KB_EVALUATION.md](./KB_EVALUATION.md)** - KB metrics & evaluation tools
+- **[SECURITY.md](./SECURITY.md)** - Security best practices & API key management
 - **[ROADMAP.md](./ROADMAP.md)** - Feature roadmap & future plans
 
 ---

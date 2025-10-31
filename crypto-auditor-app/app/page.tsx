@@ -21,13 +21,32 @@ type SearchResult = {
     [key: string]: any;
   };
   relevance: number;
+  searchMode?: 'semantic' | 'keyword' | 'hybrid';
 };
+
+type SearchMode = 'semantic' | 'keyword' | 'hybrid';
 
 export default function Home() {
   const [question, setQuestion] = useState('');
+  const [searchMode, setSearchMode] = useState<SearchMode>('hybrid');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Detect query type and suggest adaptive alpha
+  const getAdaptiveAlpha = (query: string): number => {
+    // Patterns that benefit from keyword search
+    const hasAcronyms = /[A-Z]{2,}|BTC|ETH|POW|PoW|PoS/i.test(query);
+    const hasNumbers = /\d{3,}/.test(query);
+    const hasSpecificTerms = /whitepaper|consensus|algorithm|protocol/i.test(query);
+    
+    if (hasAcronyms || hasNumbers) {
+      return 0.3; // Favor keyword matching for IDs/acronyms
+    } else if (hasSpecificTerms) {
+      return 0.7; // Favor semantic matching for conceptual terms
+    }
+    return 0.5; // Balanced for mixed queries
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,12 +55,17 @@ export default function Home() {
     setResults([]);
 
     try {
+      const alpha = getAdaptiveAlpha(question);
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ 
+          question,
+          searchMode,
+          alpha, // Send adaptive alpha to backend
+        }),
       });
 
       if (!response.ok) {
@@ -63,17 +87,17 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+    <main className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
       {/* Header */}
       <div className="border-b border-slate-700 bg-slate-800/50 backdrop-blur sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 py-6">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-3xl">🔐</span>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold bg-linear-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
               Crypto Protocol Auditor
             </h1>
           </div>
-          <p className="text-slate-400 text-sm">AI-powered retrieval system for blockchain & crypto protocol knowledge</p>
+          <p className="text-slate-400 text-sm">AI-powered hybrid search system for blockchain & crypto protocol knowledge</p>
         </div>
       </div>
 
@@ -83,8 +107,30 @@ export default function Home() {
         <div className="mb-12">
           <form onSubmit={handleSubmit} className="relative">
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl blur opacity-25 group-hover:opacity-75 transition duration-1000"></div>
+              <div className="absolute -inset-1 bg-linear-to-r from-blue-600 to-cyan-600 rounded-xl blur opacity-25 group-hover:opacity-75 transition duration-1000"></div>
               <div className="relative bg-slate-800 rounded-xl p-6">
+                {/* Search Mode Selector */}
+                <div className="mb-4 flex gap-2 flex-wrap">
+                  <label className="text-sm text-slate-300 font-semibold self-center">Search Mode:</label>
+                  {(['semantic', 'keyword', 'hybrid'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setSearchMode(mode)}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
+                        searchMode === mode
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                      {mode === 'semantic' && ' 🧠'}
+                      {mode === 'keyword' && ' 🔤'}
+                      {mode === 'hybrid' && ' 🔀'}
+                    </button>
+                  ))}
+                </div>
+
                 <input
                   type="text"
                   value={question}
@@ -95,7 +141,7 @@ export default function Home() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="mt-4 w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:from-slate-600 disabled:to-slate-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2"
+                  className="mt-4 w-full bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:from-slate-600 disabled:to-slate-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <>
@@ -131,6 +177,11 @@ export default function Home() {
                 Results
                 <span className="text-cyan-400 ml-2">({results.length})</span>
               </h2>
+              {results.length > 0 && (
+                <span className="text-sm text-slate-400 ml-4">
+                  Using: <span className="text-cyan-300 font-semibold">{results[0]?.searchMode || searchMode}</span> search
+                </span>
+              )}
             </div>
 
             <div className="grid gap-4">
@@ -162,13 +213,24 @@ export default function Home() {
                     key={index}
                     className="group relative bg-slate-800 border border-slate-700 hover:border-cyan-500/50 rounded-lg p-6 transition duration-300 hover:shadow-xl hover:shadow-cyan-500/10"
                   >
+                    {/* Search Mode Badge */}
+                    <div className={`absolute top-4 left-4 text-xs font-semibold px-2 py-1 rounded-full ${
+                      result.searchMode === 'semantic' ? 'bg-purple-900/50 text-purple-200' :
+                      result.searchMode === 'keyword' ? 'bg-orange-900/50 text-orange-200' :
+                      'bg-blue-900/50 text-blue-200'
+                    }`}>
+                      {result.searchMode === 'semantic' && '🧠 Semantic'}
+                      {result.searchMode === 'keyword' && '🔤 Keyword'}
+                      {result.searchMode === 'hybrid' && '🔀 Hybrid'}
+                    </div>
+
                     {/* Relevance Badge */}
-                    <div className={`absolute top-4 right-4 bg-gradient-to-r ${relevanceColor} text-white text-sm font-bold px-3 py-1 rounded-full`}>
+                    <div className={`absolute top-4 right-4 bg-linear-to-r ${relevanceColor} text-white text-sm font-bold px-3 py-1 rounded-full`}>
                       {relevancePercent}%
                     </div>
 
                     {/* Result Number & Project */}
-                    <div className="mb-4 pr-24">
+                    <div className="mb-4 pr-40 pt-4">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-cyan-400 text-lg font-bold">#{index + 1}</span>
                         <h3 className="text-xl font-bold text-white">{projectName}</h3>

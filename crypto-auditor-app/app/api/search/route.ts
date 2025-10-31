@@ -16,11 +16,19 @@ const connectToMindsDB = async () => {
 };
 
 export async function POST(request: Request) {
-  const { question } = await request.json();
+  const { question, searchMode = 'semantic', alpha = 0.5 } = await request.json();
 
   if (!question) {
     return NextResponse.json({ error: 'No question provided' }, { status: 400 });
   }
+
+  // Validate searchMode
+  if (!['semantic', 'keyword', 'hybrid'].includes(searchMode)) {
+    return NextResponse.json({ error: 'Invalid search mode' }, { status: 400 });
+  }
+
+  // Validate alpha (must be between 0 and 1)
+  const alphaValue = Math.max(0, Math.min(1, parseFloat(alpha as any) || 0.5));
 
   if (!(await connectToMindsDB())) {
     return NextResponse.json(
@@ -30,19 +38,57 @@ export async function POST(request: Request) {
   }
 
   try {
-    // CORRECTED QUERY: Use '=' for semantic search
-    const query = `
-      SELECT
-        metadata,
-        relevance
-      FROM
-        web3_kb
-      WHERE
-        content = '${question}'
-      LIMIT 10;
-    `;
+    // Build query based on search mode
+    let query: string;
+    
+    if (searchMode === 'semantic') {
+      // Pure semantic search (embeddings only)
+      query = `
+        SELECT
+          metadata,
+          relevance
+        FROM
+          web3_kb
+        WHERE
+          content = '${question}'
+        LIMIT 10;
+      `;
+    } else if (searchMode === 'keyword') {
+      // Pure keyword search (BM25 only)
+      query = `
+        SELECT
+          metadata,
+          relevance
+        FROM
+          web3_kb
+        WHERE
+          content LIKE '${question}'
+        USING
+          hybrid_search = true,
+          hybrid_search_alpha = 0
+        LIMIT 10;
+      `;
+    } else {
+      // Hybrid search (semantic + keyword with adjustable balance)
+      query = `
+        SELECT
+          metadata,
+          relevance
+        FROM
+          web3_kb
+        WHERE
+          content LIKE '${question}'
+        USING
+          hybrid_search = true,
+          hybrid_search_alpha = ${alphaValue}
+        LIMIT 10;
+      `;
+    }
 
+    console.log('Search Mode:', searchMode);
+    console.log('Alpha Value:', alphaValue);
     console.log('Executing Query:', query);
+    
     const queryResult = await MindsDB.SQL.runQuery(query);
 
     console.log('Query Result:', JSON.stringify(queryResult, null, 2));
@@ -52,6 +98,7 @@ export async function POST(request: Request) {
       const parsedRows = queryResult.rows.map((row: any) => ({
         metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata,
         relevance: typeof row.relevance === 'string' ? parseFloat(row.relevance) : row.relevance,
+        searchMode, // Include search mode in response for display
       }));
       
       console.log('First parsed row:', JSON.stringify(parsedRows[0], null, 2));

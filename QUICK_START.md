@@ -1,249 +1,144 @@
-# 🚀 Quick Start: MindsDB Agent Setup
+# 🚀 Quick Start Guide
 
-## Current Status
-✅ Backend `/api/agent/query` and `/api/prices` created
-✅ Frontend hybrid search UI ready
-🔄 MindsDB agent needs to be created (SQL commands ready)
+Get the Crypto Protocol Auditor running in 5 minutes.
 
 ---
 
-## Step 1: Find Your Next.js Port (1 min)
+## Prerequisites
 
-```powershell
-cd "c:\Users\KIIT\Desktop\crypto protocol auditor\crypto-auditor-app"
+- **Node.js** 18+ ([download](https://nodejs.org))
+- **Docker** & **Docker Compose** ([install](https://docs.docker.com/compose/install/))
+- **News API Key** (free tier at [newsapi.org](https://newsapi.org))
+
+---
+
+## 1️⃣ Clone & Install (2 min)
+
+```bash
+git clone https://github.com/ritoban23/crypto-protocol-auditor.git
+cd crypto-protocol-auditor
+cd crypto-auditor-app
+npm install
+```
+
+---
+
+## 2️⃣ Start Infrastructure (3 min)
+
+In a **new terminal**, from project root:
+
+```bash
+docker-compose up -d
+```
+
+This starts:
+- **MindsDB** on `http://127.0.0.1:47334`
+- **PostgreSQL** with PGVector on `localhost:5432`
+
+Wait 30 seconds for services to be ready.
+
+---
+
+## 3️⃣ Configure Environment
+
+Create `crypto-auditor-app/.env.local`:
+
+```env
+# Required: Get free key from https://newsapi.org
+NEWS_API_KEY=your_api_key_here
+
+# Optional (defaults shown)
+NEXT_PUBLIC_API_BASE=http://localhost:3000
+MINDSDB_HOST=127.0.0.1
+MINDSDB_PORT=47334
+```
+
+---
+
+## 4️⃣ Run Development Server
+
+```bash
+cd crypto-auditor-app
 npm run dev
 ```
 
-Look for output like:
+Output:
 ```
-▲ Next.js 15.x
-- Local: http://localhost:3000
-- Network: http://192.168.x.x:3000
+▲ Next.js 16.0.1
+- Local:        http://localhost:3000
+- Environments: .env.local
 ```
-
-**Your port is:** 3000 (or 3001, 3002 if 3000 is busy)
 
 ---
 
-## Step 2: Create MindsDB Agent (5 min)
+## 5️⃣ Open in Browser
 
-**Open:** `http://127.0.0.1:47334` (MindsDB SQL Editor)
+Navigate to: **http://localhost:3000** ✅
 
-**Paste and run:**
+You should see:
+- 🔐 **Header**: "Crypto Protocol Auditor"
+- 🔍 **Search box**: "Ask about any crypto protocol"
+- 🟡 **Empty state cards**: Sentiment Badges, Recent News, Protocol Comparison
 
+---
+
+## ✅ Verify Setup
+
+### Test Search
+Try these queries:
+
+1. **KB-Only**: "What is Bitcoin consensus mechanism?"
+2. **Price-Only**: "What is Ethereum's current price?"
+3. **Combined**: "Tell me about Bitcoin and its price"
+
+Expected: 
+- Instant response (<2s for combined)
+- KB content + live prices + sentiment badge 📈
+
+### Test MindsDB (Optional)
+
+Open `http://127.0.0.1:47334` (MindsDB SQL Editor)
+
+Run:
 ```sql
--- Step 2.1: Verify KB exists
-SELECT COUNT(*) as total_docs FROM web3_kb;
+SELECT COUNT(*) as docs FROM web3_kb;
 ```
 
-Expected: `total_docs: 1000+` ✅
-
-**Then run:**
-
-```sql
--- Step 2.2: Test KB query (no content column - DuckDB limitation)
-SELECT 
-    relevance,
-    metadata
-FROM web3_kb
-WHERE metadata LIKE '%Bitcoin%'
-LIMIT 3;
-```
-
-Expected: 3 rows with relevance scores ✅
-
-**Finally, create the agent:**
-
-```sql
--- Step 2.3: Create agent (REPLACE YOUR_API_KEY)
-CREATE AGENT crypto_auditor_agent
-USING
-    model = {
-        "provider": "google",
-        "model_name": "gemini-2.0-flash",
-        "api_key": "AIzaSyBTRdxDRy5ii22Gc7iykczL013nOpYwwJM"
-    },
-    data = {
-        "knowledge_bases": ["mindsdb.web3_kb"]
-    },
-    prompt_template='
-        You are a crypto protocol auditor assistant.
-        The knowledge base contains cryptocurrency whitepapers and technical docs.
-        Answer technical questions precisely using the knowledge base.
-        If asked about prices, say you only have technical data.
-    ',
-    timeout=30;
-```
-
-Expected: `Agent crypto_auditor_agent created successfully` ✅
+Expected: `docs: 1000+` ✅
 
 ---
 
-## Step 3: Test the Agent (3 min)
+## 🚀 You're Ready!
 
-**In MindsDB SQL Editor:**
+The app is fully functional:
 
-```sql
--- Test query
-SELECT answer
-FROM crypto_auditor_agent
-WHERE question = 'What is Bitcoin proof of work?';
-```
-
-Expected: Detailed answer about PoW ✅
+✅ Dark theme + Gruppo font applied  
+✅ Sentiment analysis integrated  
+✅ Live prices from CoinGecko  
+✅ Protocol comparison available  
+✅ 40+ cryptocurrencies supported
 
 ---
 
-## Step 4: Test Backend (2 min)
+## 📌 Common Issues
 
-**In PowerShell (replace 3000 with your port from Step 1):**
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/agent/query" `
-  -Method POST `
-  -ContentType "application/json" `
-  -Body '{"query":"What is Bitcoin consensus?"}'
-```
-
-**If this fails with connection error:**
-- Check `npm run dev` is running
-- Verify the port number (3000 vs 3001 vs 3002)
-- Try `http://127.0.0.1:PORT` instead of `localhost`
-
-Expected: JSON response with `kb_results` ✅
+| Problem | Solution |
+|---------|----------|
+| Port 3000 busy | Change in `package.json` or use port from output |
+| MindsDB not responding | Wait 30s, check `docker ps`, run `docker logs` |
+| News API error | Verify key in `.env.local`, activate account at newsapi.org |
+| Dark theme not showing | Hard refresh: `Ctrl+Shift+R` (Windows) or `Cmd+Shift+R` (Mac) |
 
 ---
 
-## Step 5: Update Backend to Use MindsDB Agent (10 min)
+## 📚 Next Steps
 
-**Edit:** `crypto-auditor-app/app/api/agent/query/route.ts`
-
-**Find the function:** `executeKBSearch`
-
-**Replace the MindsDB query from:**
-```typescript
-query: `SELECT content, relevance, metadata FROM web3_kb WHERE...`
-```
-
-**To:**
-```typescript
-query: `
-  SELECT answer
-  FROM crypto_auditor_agent
-  WHERE question = '${query.replace(/'/g, "''")}';
-`
-```
-
-**Update the response parsing:**
-```typescript
-const data = await response.json();
-const answer = data.data?.[0]?.answer || '';
-
-return {
-  results: [{
-    content: answer,
-    relevance: 1.0,
-    metadata: { _source: 'MindsDB Agent' },
-    source: 'MindsDB Agent',
-    searchMode: 'agent'
-  }],
-  duration: Date.now() - startTime
-};
-```
+- **Learn more**: See `README.md` for features & architecture
+- **See roadmap**: Check `ROADMAP.md` for upcoming features
+- **Deploy**: Ready for production build with `npm run build`
 
 ---
 
-## Step 6: Test End-to-End (5 min)
+**Questions?** Check the GitHub Issues or review `README.md`.
 
-**Test in PowerShell:**
-
-```powershell
-# Test 1: KB-only
-Invoke-RestMethod -Uri "http://localhost:3000/api/agent/query" `
-  -Method POST `
-  -ContentType "application/json" `
-  -Body '{"query":"What is Ethereum smart contract?"}'
-
-# Test 2: Price-only
-Invoke-RestMethod -Uri "http://localhost:3000/api/agent/query" `
-  -Method POST `
-  -ContentType "application/json" `
-  -Body '{"query":"What is Bitcoin price?"}'
-
-# Test 3: Combined
-Invoke-RestMethod -Uri "http://localhost:3000/api/agent/query" `
-  -Method POST `
-  -ContentType "application/json" `
-  -Body '{"query":"Tell me about Bitcoin and its current price"}'
-```
-
----
-
-## ✅ Success Checklist
-
-- [x] MindsDB agent created and responds to queries
-- [x] Next.js dev server running (port 3000)
-- [x] Backend connects to MindsDB agent successfully
-- [x] Price API working
-- [x] All 3 test queries return correct classifications
-- [x] **AGENT INTEGRATION COMPLETE! Ready for frontend** 🎉
-
----
-
-## 🎉 Integration Complete!
-
-Your agent backend is now fully functional:
-
-**✅ KB-Only Queries:** Returns technical answers from whitepapers
-**✅ Price-Only Queries:** Returns live crypto prices  
-**✅ Combined Queries:** Returns both technical info + live prices
-
-**Example Results:**
-```powershell
-# KB-Only
-Query: "Explain proof of stake"
-→ Classification: kb_only
-→ KB Results: 1, Price Results: 0
-
-# Price-Only  
-Query: "What is Ethereum price?"
-→ Classification: price_only
-→ KB Results: 0, Price Results: 1 ($3,827)
-
-# Combined
-Query: "Tell me about Bitcoin and its price"
-→ Classification: combined
-→ KB Results: 1, Price Results: 1 ($109,582)
-```
-
----
-
-## 🚀 Next Step: Frontend Integration
-
-Your backend is ready! Now update the frontend to use it:
-
-1. Open `crypto-auditor-app/app/page.tsx`
-2. The frontend already has the agent endpoint integration
-3. Test in the UI at `http://localhost:3000`
-
----
-
-## 🐛 Common Issues
-
-**Issue:** "Failed to connect to localhost:3001"
-**Fix:** Check actual port from `npm run dev` output. Use that port in curl/Invoke-RestMethod.
-
-**Issue:** "Agent not found"
-**Fix:** Run `SHOW AGENTS;` in MindsDB SQL Editor. If empty, re-run `CREATE AGENT` command.
-
-**Issue:** "Cannot read property 'answer'"
-**Fix:** Check MindsDB SQL query response format. Add console.log to see raw response.
-
-**Issue:** "API key error"
-**Fix:** Replace `YOUR_GOOGLE_API_KEY_HERE` with real Google API key in CREATE AGENT.
-
----
-
-## 📚 Full Documentation
-
-See **MINDSDB_AGENT_GUIDE.md** for complete details, troubleshooting, and advanced configuration.
+Happy auditing! 🎉

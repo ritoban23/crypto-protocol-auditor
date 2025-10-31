@@ -47,10 +47,9 @@ async function fetchProjectNews(project: string, days: number = 7): Promise<News
   try {
     // Query News API through MindsDB
     const query = `
-      SELECT title, description, source, publishedAt, url
+      SELECT title, description, source_name, publishedAt, url
       FROM crypto_news.article
       WHERE query = '${searchTerms[0]} cryptocurrency'
-      AND publishedAt >= CURRENT_DATE - INTERVAL ${days} DAY
       LIMIT 20;
     `;
 
@@ -64,7 +63,7 @@ async function fetchProjectNews(project: string, days: number = 7): Promise<News
 
     if (data.data && Array.isArray(data.data)) {
       // Parse response (array of arrays format)
-      const columnNames = data.column_names || ['title', 'description', 'source', 'publishedAt', 'url'];
+      const columnNames = data.column_names || ['title', 'description', 'source_name', 'publishedAt', 'url'];
       
       data.data.forEach((row: any[]) => {
         const article: any = {};
@@ -75,7 +74,7 @@ async function fetchProjectNews(project: string, days: number = 7): Promise<News
         articles.push({
           title: article.title || '',
           description: article.description || '',
-          source: typeof article.source === 'object' ? article.source.name : article.source || 'Unknown',
+          source: article.source_name || 'Unknown',
           publishedAt: article.publishedAt || new Date().toISOString(),
           url: article.url || '',
         });

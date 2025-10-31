@@ -25,6 +25,21 @@ type PriceResult = {
   last_updated: string;
 };
 
+type SentimentData = {
+  sentiment: 'bullish' | 'bearish' | 'neutral';
+  score: number;
+  confidence: number;
+  summary: string;
+  newsCount: number;
+  recentNews?: Array<{
+    title: string;
+    description: string;
+    source_name?: string;
+    url: string;
+    publishedAt: string;
+  }>;
+};
+
 type AgentResponse = {
   queryId: string;
   originalQuery: string;
@@ -43,11 +58,109 @@ type AgentResponse = {
   agentReasoning: string;
 };
 
+/**
+ * Extract project name from KB result content
+ */
+function extractProjectName(content: string): string | null {
+  const projectKeywords: { [key: string]: string } = {
+    bitcoin: 'bitcoin',
+    ethereum: 'ethereum',
+    ripple: 'ripple',
+    xrp: 'ripple',
+    avalanche: 'avalanche',
+    cardano: 'cardano',
+    polkadot: 'polkadot',
+    solana: 'solana',
+    polygon: 'polygon',
+    arbitrum: 'arbitrum',
+  };
+
+  for (const [keyword, projectName] of Object.entries(projectKeywords)) {
+    if (content.toLowerCase().includes(keyword)) {
+      return projectName;
+    }
+  }
+  return null;
+}
+
+/**
+ * Sentiment Badge Component
+ */
+function SentimentBadge({ sentiment, score, confidence }: { sentiment: string; score: number; confidence: number }) {
+  const getColors = () => {
+    switch (sentiment.toLowerCase()) {
+      case 'bullish':
+        return { bg: 'bg-green-900/30', text: 'text-green-300', border: 'border-green-500/50', icon: '🟢' };
+      case 'bearish':
+        return { bg: 'bg-red-900/30', text: 'text-red-300', border: 'border-red-500/50', icon: '🔴' };
+      default:
+        return { bg: 'bg-yellow-900/30', text: 'text-yellow-300', border: 'border-yellow-500/50', icon: '🟡' };
+    }
+  };
+
+  const colors = getColors();
+
+  return (
+    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${colors.bg} border ${colors.border}`}>
+      <span className="text-sm">{colors.icon}</span>
+      <span className={`text-sm font-semibold ${colors.text} capitalize`}>
+        {sentiment}
+      </span>
+      <span className={`text-xs ${colors.text}`}>
+        ({(score * 100).toFixed(0)}%)
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Recent News Item Component
+ */
+function NewsItem({ article }: { article: any }) {
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch {
+      return 'Recently';
+    }
+  };
+
+  return (
+    <a
+      href={article.url || '#'}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block group hover:bg-slate-700/50 p-3 rounded transition duration-200"
+    >
+      <div className="flex items-start gap-2">
+        <span className="text-sm text-slate-400 mt-0.5 shrink-0">📰</span>
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-medium text-slate-300 group-hover:text-white line-clamp-2 transition">
+            {article.title}
+          </h4>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-slate-500">
+              {article.source_name || 'News'}
+            </span>
+            <span className="text-xs text-slate-600">•</span>
+            <span className="text-xs text-slate-500">
+              {formatDate(article.publishedAt)}
+            </span>
+          </div>
+        </div>
+        <span className="text-slate-400 group-hover:text-slate-300 shrink-0">→</span>
+      </div>
+    </a>
+  );
+}
+
 export default function Home() {
   const [question, setQuestion] = useState('');
   const [agentResponse, setAgentResponse] = useState<AgentResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sentimentCache, setSentimentCache] = useState<Record<string, SentimentData>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +191,30 @@ export default function Home() {
       const data: AgentResponse = await response.json();
       console.log('Agent Response:', data);
       setAgentResponse(data);
+      
+      // Fetch sentiment data for each KB result's project
+      if (data.results.kb_results && data.results.kb_results.length > 0) {
+        const projectNames = data.results.kb_results
+          .map(r => extractProjectName(r.content))
+          .filter((p): p is string => p !== null);
+        
+        // Deduplicate and fetch sentiment for each project
+        const uniqueProjects = Array.from(new Set(projectNames));
+        for (const project of uniqueProjects) {
+          try {
+            const sentimentRes = await fetch(`/api/sentiment?project=${project}&days=7`);
+            if (sentimentRes.ok) {
+              const sentimentData = await sentimentRes.json();
+              setSentimentCache(prev => ({
+                ...prev,
+                [project]: sentimentData
+              }));
+            }
+          } catch (err) {
+            console.error(`Failed to fetch sentiment for ${project}:`, err);
+          }
+        }
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -198,39 +335,78 @@ export default function Home() {
             </div>
 
             <div className="grid gap-4">
-              {agentResponse.results.kb_results.map((result, index) => (
-                <div
-                  key={index}
-                  className="group relative bg-slate-800 border border-slate-700 hover:border-purple-500/50 rounded-lg p-6 transition duration-300 hover:shadow-xl hover:shadow-purple-500/10"
-                >
-                  <div className="flex items-start gap-4">
-                    <span className="text-3xl">🤖</span>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-white mb-3">AI Agent Response</h3>
-                      <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{result.content}</p>
-                    </div>
-                  </div>
-                  
-                  {result.relevance && (
-                    <div className="mt-4 pt-4 border-t border-slate-700">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-400">Relevance:</span>
-                        <div className="flex-1 bg-slate-700 rounded-full h-2 overflow-hidden">
-                          <div 
-                            className={`h-full bg-linear-to-r ${
-                              result.relevance > 0.8 ? 'from-green-500 to-emerald-500' :
-                              result.relevance > 0.6 ? 'from-blue-500 to-cyan-500' :
-                              'from-yellow-500 to-orange-500'
-                            }`}
-                            style={{ width: `${result.relevance * 100}%` }}
-                          ></div>
+              {agentResponse.results.kb_results.map((result, index) => {
+                const projectName = extractProjectName(result.content);
+                const sentiment = projectName ? sentimentCache[projectName] : null;
+                
+                return (
+                  <div
+                    key={index}
+                    className="group relative bg-slate-800 border border-slate-700 hover:border-purple-500/50 rounded-lg p-6 transition duration-300 hover:shadow-xl hover:shadow-purple-500/10"
+                  >
+                    <div className="flex items-start gap-4">
+                      <span className="text-3xl">🤖</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-3 flex-wrap">
+                          <h3 className="text-lg font-semibold text-white">AI Agent Response</h3>
+                          {sentiment && (
+                            <SentimentBadge
+                              sentiment={sentiment.sentiment}
+                              score={sentiment.score}
+                              confidence={sentiment.confidence}
+                            />
+                          )}
                         </div>
-                        <span className="text-xs font-bold text-cyan-400">{(result.relevance * 100).toFixed(1)}%</span>
+                        <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{result.content}</p>
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                    
+                    {/* Sentiment Summary */}
+                    {sentiment && (
+                      <div className="mt-6 pt-6 border-t border-slate-700">
+                        <div className="mb-4">
+                          <p className="text-sm text-slate-400 mb-2">💬 Market Sentiment Summary</p>
+                          <p className="text-sm text-slate-300 leading-relaxed">{sentiment.summary}</p>
+                          <div className="mt-2 text-xs text-slate-500">
+                            Confidence: {(sentiment.confidence * 100).toFixed(0)}% | Based on {sentiment.newsCount} articles
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Recent News Section */}
+                    {sentiment && sentiment.recentNews && sentiment.recentNews.length > 0 && (
+                      <div className="mt-6 pt-6 border-t border-slate-700">
+                        <p className="text-sm font-semibold text-slate-300 mb-3">📰 Recent News</p>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {sentiment.recentNews.slice(0, 4).map((article, idx) => (
+                            <NewsItem key={idx} article={article} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  
+                    {result.relevance && (
+                      <div className="mt-6 pt-6 border-t border-slate-700">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400">Relevance:</span>
+                          <div className="flex-1 bg-slate-700 rounded-full h-2 overflow-hidden">
+                            <div 
+                              className={`h-full bg-linear-to-r ${
+                                result.relevance > 0.8 ? 'from-green-500 to-emerald-500' :
+                                result.relevance > 0.6 ? 'from-blue-500 to-cyan-500' :
+                                'from-yellow-500 to-orange-500'
+                              }`}
+                              style={{ width: `${result.relevance * 100}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs font-bold text-cyan-400">{(result.relevance * 100).toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

@@ -82,7 +82,7 @@ const setCachedPrices = (projects: string[], data: any): void => {
  */
 const fetchFromCoinGecko = async (coinIds: string[]): Promise<any> => {
   const ids = coinIds.join(',');
-  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_7d_change=true`;
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`;
   
   console.log(`📡 Fetching from CoinGecko: ${url.substring(0, 80)}...`);
   

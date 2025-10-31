@@ -81,7 +81,11 @@ async function fetchProjectKBData(project: string): Promise<ComparisonProject['t
  */
 async function fetchProjectPrice(project: string): Promise<ComparisonProject['priceData']> {
   try {
-    const response = await fetch(`http://localhost:3000/api/prices?projects=${project}`);
+    const response = await fetch(`http://localhost:3000/api/prices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projects: [project] }),
+    });
     const data = await response.json();
 
     if (data.data && data.data[project.toLowerCase()]) {

@@ -5,6 +5,14 @@ Built with Next.js, MindsDB, and modern fintech design.
 
 ---
 
+## 📚 Documentation Quick Links
+
+- **[QUICK_START.md](./QUICK_START.md)** - Get running in 5 minutes
+- **[KB_EVALUATION.md](./KB_EVALUATION.md)** - KB metrics & evaluation tools
+- **[ROADMAP.md](./ROADMAP.md)** - Feature roadmap & future plans
+
+---
+
 ## 🎯 What It Does
 
 **Hybrid Search** combines knowledge base, live prices, and sentiment analysis in one query:
@@ -66,8 +74,12 @@ crypto-protocol-auditor/
 │   │       └── search/           # MindsDB KB search
 │   └── package.json
 ├── docker-compose.yml             # MindsDB + PGVector services
-├── QUICK_START.md                 # Setup instructions
-└── ROADMAP.md                    # Feature roadmap & future plans
+├── kb_evaluate.py                 # Basic KB evaluation tool
+├── advanced_kb_evaluate.py        # Advanced KB evaluation (MRR, NDCG, etc)
+├── KB_EVALUATION.sql              # MindsDB test queries
+├── QUICK_START.md                 # Setup instructions (5 min)
+├── KB_EVALUATION.md               # KB metrics & evaluation guide
+└── ROADMAP.md                    # Feature roadmap
 ```
 
 ---

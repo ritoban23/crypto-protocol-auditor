@@ -13,7 +13,7 @@ services:
           "default_embedding_model": {
             "provider": "google",
             "model_name": "text-embedding-004",
-            "api_key": "AIzaSyBTRdxDRy5ii22Gc7iykczL013nOpYwwJM"
+            "api_key": "${GOOGLE_API_KEY}"
           }
         }
     volumes:

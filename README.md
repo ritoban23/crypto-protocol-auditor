@@ -5,19 +5,10 @@ Built with Next.js, MindsDB, and modern fintech design.
 
 ---
 
-## ⚠️ Security Notice
-
-**API Keys require secure configuration.** See [SECURITY.md](./SECURITY.md) for details.
-
-This project uses environment variables (`.env`) to manage secrets safely. Never commit API keys to Git.
-
----
-
 ## 📚 Documentation Quick Links
 
-- **[QUICK_START.md](./QUICK_START.md)** - Get running in 5 minutes (includes API key setup)
+- **[QUICK_START.md](./QUICK_START.md)** - Get running in 5 minutes
 - **[KB_EVALUATION.md](./KB_EVALUATION.md)** - KB metrics & evaluation tools
-- **[SECURITY.md](./SECURITY.md)** - Security best practices & API key management
 - **[ROADMAP.md](./ROADMAP.md)** - Feature roadmap & future plans
 
 ---
@@ -64,7 +55,40 @@ This project uses environment variables (`.env`) to manage secrets safely. Never
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ System Architecture
+
+![Crypto Protocol Auditor Architecture](./crypto_auditor_architecture.jpg)
+
+### Architecture Overview
+
+**Zone 1: Frontend (User Layer)**
+- Next.js + React 19 with TypeScript
+- Dark theme with Gruppo typography
+- Real-time search, comparison, and sentiment displays
+
+**Zone 2: Backend (API Routes)**
+- `/api/agent/query` - Main orchestrator (hybrid search)
+- `/api/sentiment` - Market sentiment analysis
+- `/api/compare` - Protocol comparison
+- `/api/prices` - Live pricing (cached)
+- `/api/search` - Direct KB search
+
+**Zone 3: MindsDB (AI Brain)**
+- `crypto_auditor_agent` - Main intelligence engine (Gemini LLM)
+- `web3_kb` - Knowledge base (112+ documents, 40+ cryptos)
+- `crypto_news` - News database for sentiment
+- Vector embeddings via PGVector
+
+**Zone 4: Data Layer**
+- **PGVector DB** - Stores KB embeddings
+- **Neon Postgres** - Project metadata
+- **CoinGecko API** - Live prices
+- **News API** - Market sentiment data
+- **LLM API** - Gemini for response synthesis
+
+---
+
+## 📁 Project Structure
 
 ```
 crypto-protocol-auditor/
@@ -83,6 +107,7 @@ crypto-protocol-auditor/
 │   │       └── search/           # MindsDB KB search
 │   └── package.json
 ├── docker-compose.yml             # MindsDB + PGVector services
+├── crypto_auditor_architecture.jpg # System architecture diagram
 ├── kb_evaluate.py                 # Basic KB evaluation tool
 ├── advanced_kb_evaluate.py        # Advanced KB evaluation (MRR, NDCG, etc)
 ├── KB_EVALUATION.sql              # MindsDB test queries
@@ -92,6 +117,8 @@ crypto-protocol-auditor/
 ```
 
 ---
+
+## 🏗️ Architecture
 
 ## 🚀 Quick Start
 

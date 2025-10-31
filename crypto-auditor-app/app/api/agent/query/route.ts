@@ -199,19 +199,19 @@ async function executeKBSearch(
     // Use MindsDB Agent instead of direct KB query
     console.log(`[KB Search] Querying MindsDB agent with: "${query}"`);
     
-    const response = await fetch('http://127.0.0.1:47335/api/sql', {
+    // MindsDB HTTP API is on port 47334, not 47335 (47335 is SQL wire protocol)
+    const response = await fetch('http://127.0.0.1:47334/api/sql/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        query: `
-          SELECT answer
-          FROM crypto_auditor_agent
-          WHERE question = '${query.replace(/'/g, "''")}';
-        `,
+        query: `SELECT answer FROM crypto_auditor_agent WHERE question = '${query.replace(/'/g, "''")}'`
       }),
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[KB Search] MindsDB agent query failed: ${response.statusText}`);
+      console.error(`[KB Search] Error response:`, errorText);
       throw new Error(`MindsDB agent query failed: ${response.statusText}`);
     }
 
@@ -224,7 +224,8 @@ async function executeKBSearch(
       return { results: [], duration: Date.now() - startTime };
     }
     
-    const answer = data.data?.[0]?.answer || '';
+    // MindsDB returns data as array of arrays: data[0][0] is the first row, first column
+    const answer = data.data[0]?.[0] || '';
     console.log(`[KB Search] Agent answer length: ${answer.length} chars`);
     
     if (!answer) {
@@ -267,7 +268,7 @@ async function executePriceFetch(
       return { results: [], duration: 0 };
     }
 
-    const response = await fetch('http://localhost:3001/api/prices', {
+    const response = await fetch('http://localhost:3000/api/prices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -282,18 +283,31 @@ async function executePriceFetch(
 
     const data = await response.json();
     const duration = Date.now() - startTime;
+    
+    console.log(`[Price Fetch] API response:`, JSON.stringify(data, null, 2));
 
     // Transform to PriceResult format
-    const results: PriceResult[] = (data.prices || []).map((price: any) => ({
-      project: price.project,
-      price_usd: price.price_usd,
-      market_cap_usd: price.market_cap_usd,
-      volume_24h_usd: price.volume_24h_usd,
-      price_change_24h: price.price_change_24h,
-      price_change_7d: price.price_change_7d,
-      last_updated: price.last_updated,
-    }));
-
+    // API returns: { data: { bitcoin: {...}, ethereum: {...} }, source, timestamp }
+    const results: PriceResult[] = [];
+    
+    if (data.data) {
+      for (const [projectKey, projectData] of Object.entries(data.data)) {
+        const priceData = projectData as any;
+        if (priceData.status === 'success') {
+          results.push({
+            project: priceData.name || projectKey,
+            price_usd: priceData.price_usd,
+            market_cap_usd: priceData.market_cap_usd,
+            volume_24h_usd: priceData.volume_24h_usd,
+            price_change_24h: priceData.price_change_24h,
+            price_change_7d: priceData.price_change_7d || 0,
+            last_updated: priceData.last_updated,
+          });
+        }
+      }
+    }
+    
+    console.log(`[Price Fetch] Transformed ${results.length} price results`);
     return { results, duration };
   } catch (error) {
     console.error('Price Fetch Error:', error);

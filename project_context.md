@@ -367,33 +367,42 @@ Hybrid search combines:
 
 ---
 
-### 9. Live Data Integration (In Progress)
+### 9. Advanced Agent Implementation (In Progress)
 
-**What is Live Data Integration?**
-Combines static KB search with live market data:
-- User: "What is Bitcoin's price and consensus?"
-- App returns: KB results (protocol info) + live prices
-- User gets: Complete picture of both technical and market aspects
+**What is the Agent?**
+An intelligent orchestrator that:
+- Classifies queries into KB-only, price-only, or combined
+- Routes to appropriate data sources
+- Executes KB search and price fetch in parallel
+- Combines results intelligently
+- Provides reasoning for its decisions
 
 **Architecture:**
-1. **Price API** (`/app/api/prices/route.ts`): Fetches from CoinGecko
-2. **Frontend Integration**: Detects projects in query, fetches prices
-3. **Caching Strategy**: 5-minute TTL to prevent rate limiting
-4. **Combined Results**: Shows KB results + price data together
+1. **Query Classifier**: Detects query type based on keywords
+2. **Parallel Execution**: KB search + price fetch simultaneously
+3. **Smart Routing**: kb_only → KB search only, price_only → prices only, combined → both
+4. **Result Combination**: Unified response format with metadata
 
 **Implementation Status:**
-- ✅ Price API route created and tested
-- ✅ CoinGecko integration with 12+ cryptocurrencies
-- ✅ Caching mechanism implemented
-- ✅ Architecture documentation complete
-- 🟡 Frontend integration (in your hands)
-- 🟡 Testing (next step)
+- ✅ Agent endpoint created (`/app/api/agent/query/route.ts`)
+- ✅ Query classification logic (keyword-based + project detection)
+- ✅ Parallel execution system (Promise.all for speed)
+- ✅ Complete documentation and guides
+- ✅ MindsDB integration designed
+- 🔄 MindsDB setup (SQL commands ready - YOUR TURN)
+- 🟡 Frontend integration (after MindsDB setup)
+- 🟡 End-to-end testing
+
+**Documentation Files:**
+- `AGENT_QUICK_REFERENCE.md` - Visual guides + setup checklist
+- `MINDSDB_AGENT_GUIDE.md` - 13 detailed SQL setup steps
+- `AGENT_IMPLEMENTATION_SUMMARY.md` - Complete implementation guide
 
 **Next Actions:**
-1. Choose implementation path (Quick: 1h vs Learning: 2-3h)
-2. Follow `FRONTEND_IMPLEMENTATION_GUIDE.md`
-3. Test with combined queries
-4. Commit changes
+1. Set up MindsDB (run 4 SQL commands - 10 min)
+2. Test agent endpoint (run 3 curl commands - 5 min)
+3. Integrate frontend UI (code provided - 30 min)
+4. Test end-to-end (verify - 10 min)
 
 ---
 

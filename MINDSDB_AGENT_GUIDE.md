@@ -1,597 +1,360 @@
-# 🤖 MindsDB Agent Guide: Building the Crypto Auditor Agent
+# 🤖 MindsDB Agent: Complete Implementation Guide
 
 ## Overview
 
-We're building a **MindsDB Agent** that intelligently decides:
-- When to search the knowledge base
-- When to fetch live prices
-- When to combine both
-- How to route queries intelligently
+Building a **MindsDB Agent** that intelligently combines:
+- 📚 Knowledge Base searches (web3_kb - whitepapers)
+- 💰 Live crypto prices (CoinGecko API via Next.js)
+- 🎯 Smart query classification and routing
 
-This guide walks you through setting it up **step-by-step in the MindsDB SQL Editor**.
+**Architecture:**
+```
+User Query → MindsDB Agent → Decides: KB / Prices / Both → Returns Combined Results
+```
+
+This guide provides **SQL-based agent creation** using MindsDB's native agent syntax.
 
 ---
 
 ## 📋 Prerequisites
 
-✅ MindsDB running on `http://127.0.0.1:47334`
-✅ PGVector running with your knowledge base (`web3_kb` table)
-✅ Price API created at `/app/api/prices`
-✅ Next.js app running on `localhost:3001`
+✅ MindsDB running: `http://127.0.0.1:47334`
+✅ PGVector with knowledge base: `web3_kb` table populated
+✅ Next.js backend: Price API at `/app/api/prices` (port TBD - check with `npm run dev` output)
+✅ OpenAI/Google API key for the agent's LLM (Gemini recommended)
 
 ---
 
-## 🚀 Step-by-Step: Building Your Agent
+## 🚀 Step-by-Step: Create Your MindsDB Agent
 
-### STEP 1: Access MindsDB SQL Editor
+### STEP 1: Verify Knowledge Base Exists (2 min)
 
-**Location:** `http://127.0.0.1:47334`
+**Open MindsDB SQL Editor:** `http://127.0.0.1:47334`
 
-1. Open browser → Navigate to MindsDB URL
-2. Click **SQL Editor** (or query button)
-3. You should see a SQL query interface
-
-**What you'll see:**
-- SQL input area (large text box)
-- Execute button (▶️ Run)
-- Results panel below
-
----
-
-### STEP 2: Check Your Knowledge Base Table
-
-**Purpose:** Verify the table exists and has data
-
-**Command to run in SQL Editor:**
+Run this query to verify your KB:
 
 ```sql
-SELECT 
-    COUNT(*) as total_documents,
-    COUNT(DISTINCT metadata) as unique_metadata_entries
-FROM web3_kb;
+-- Check KB table exists and has data
+SELECT COUNT(*) as total_documents FROM web3_kb;
 ```
 
-**Expected output:**
-```
-total_documents: 1250+
-unique_metadata_entries: 500+
-```
+**Expected output:** `total_documents: 1000+`
 
-**What this tells you:** Your KB is populated and ready for agent queries.
+If you get results → ✅ Your KB is ready!
 
 ---
 
-### STEP 3: Verify Search is Working
+### STEP 2: Test KB Query (3 min)
 
-**Purpose:** Confirm hybrid search queries work
-
-**Command to run in SQL Editor:**
+**IMPORTANT:** Don't select `content` column due to DuckDB limitations. Query metadata and relevance only:
 
 ```sql
+-- Query KB for Bitcoin (without content column)
 SELECT 
-    content,
     relevance,
     metadata
 FROM web3_kb
-WHERE content LIKE '%Bitcoin%'
-    AND content = 'What is Bitcoin consensus?'
-    AND hybrid_search = true
-    AND hybrid_search_alpha = 0.7
+WHERE metadata LIKE '%Bitcoin%'
+LIMIT 5;
+```
+
+**Expected output:** 5 rows with relevance scores and metadata JSON
+
+If you get results → ✅ KB search works!
+
+**Alternative** (if metadata search doesn't work, search on embeddings directly):
+
+```sql
+-- Use semantic search instead
+SELECT 
+    relevance,
+    metadata
+FROM web3_kb
+WHERE content = 'Bitcoin proof of work'
 LIMIT 3;
 ```
 
-**Expected output:**
-```
-content: [chunk of whitepaper text]
-relevance: 0.876
-metadata: {"_source": "bitcoin_whitepaper.pdf", ...}
-```
-
-**What this tells you:** Search capability is working.
-
 ---
 
-## 🎯 Phase 1: Create the Agent Skeleton
+### STEP 3: Create the MindsDB Agent (10 min)
 
-### STEP 4: Create a Simple Agent (Query Router)
+**Purpose:** Create an agent that can query your knowledge base intelligently
 
-The agent will have **three different query types**:
-
-```sql
--- Create an agent that routes queries
--- This agent will:
--- 1. Detect query type (KB-only, price-only, combined)
--- 2. Route to appropriate handler
--- 3. Combine results
-
--- First, let's understand the agent structure by querying system info
-SELECT * FROM information_schema.tables 
-WHERE table_schema = 'mindsdb' 
-LIMIT 5;
-```
-
-**Expected output:**
-- You'll see system tables in MindsDB
-- This confirms your MindsDB instance can query its own metadata
-
----
-
-## 🔧 Phase 2: Set Up Agent Tools
-
-### STEP 5: Create Tool 1 - Knowledge Base Query Tool
-
-This tool searches your KB with smart parameters.
-
-**Run this in SQL Editor:**
+**SQL Command to run in MindsDB:**
 
 ```sql
--- Create a stored procedure / model for KB querying
--- We'll use MindsDB's native capabilities
-
--- First, check if we can create a knowledge base model
-SELECT 
-    model_id,
-    model_name,
-    model_engine
-FROM information_schema.models
-WHERE model_engine = 'knowledge_base'
-LIMIT 5;
+CREATE AGENT crypto_auditor_agent
+USING
+    model = {
+        "provider": "google",
+        "model_name": "gemini-2.0-flash",
+        "api_key": "YOUR_GOOGLE_API_KEY_HERE"
+    },
+    data = {
+        "knowledge_bases": ["mindsdb.web3_kb"]
+    },
+    prompt_template='
+        You are a crypto protocol auditor assistant.
+        
+        The knowledge base "mindsdb.web3_kb" contains:
+        - Cryptocurrency whitepapers
+        - Technical protocol documentation
+        - Consensus mechanisms
+        - Smart contract details
+        
+        When answering questions:
+        1. Search the knowledge base for technical/protocol information
+        2. Cite sources from metadata when available
+        3. Be precise and technical
+        4. If asked about prices or market data, say "I only have technical protocol data, not live prices"
+    ',
+    timeout=30;
 ```
 
 **What this does:**
-- Lists existing KB models
-- Shows you what's available to work with
+- Creates an agent named `crypto_auditor_agent`
+- Uses Google Gemini 2.0 Flash as the LLM
+- Connects to your `web3_kb` knowledge base
+- Sets instructions for how to answer questions
+- 30-second timeout for responses
 
-**Expected output:**
-- Shows your knowledge base models
-- Or empty if none created yet
+**Replace `YOUR_GOOGLE_API_KEY_HERE`** with your actual Google API key.
+
+**Expected output:** `Agent crypto_auditor_agent created successfully`
+
+If you get this → ✅ Agent is created!
 
 ---
 
-### STEP 6: Create Tool 2 - Price Lookup Handler
-
-**Purpose:** Define how the agent fetches prices
-
-Since MindsDB doesn't directly call external Node.js APIs, we'll:
-1. Create a **handler model** that routes to your price API
-2. Document the integration point
-3. Show you how the agent will call it
-
-**Run this in SQL Editor:**
+### STEP 4: Verify Agent Was Created (1 min)
 
 ```sql
--- Create a view that represents price data handler
--- This will be our interface to the price API
-
-CREATE VIEW IF NOT EXISTS price_api_handler AS
-SELECT 
-    'price_lookup' as handler_type,
-    'Calls /api/prices endpoint' as description,
-    'POST' as method,
-    'http://localhost:3001/api/prices' as endpoint;
-
--- Verify it created
-SELECT * FROM price_api_handler;
+SHOW AGENTS WHERE name = 'crypto_auditor_agent';
 ```
 
-**Expected output:**
-```
-handler_type: price_lookup
-description: Calls /api/prices endpoint
-method: POST
-endpoint: http://localhost:3001/api/prices
-```
+**Expected output:** Shows your agent with model details
 
 ---
 
-## 🤖 Phase 3: Create the Agent Logic
+### STEP 5: Query the Agent (5 min)
 
-### STEP 7: Create Query Classification Function
-
-This helps the agent understand what type of query it received.
-
-**Run this in SQL Editor:**
+**Test 1: KB-Only Question**
 
 ```sql
--- Create a view to show agent decision logic
-CREATE VIEW IF NOT EXISTS crypto_auditor_agent_rules AS
-SELECT 
-    'rule_1' as rule_id,
-    'kb_only' as query_type,
-    'Query contains protocol, whitepaper, consensus, or technical terms' as trigger_condition,
-    'Search web3_kb table with semantic search (alpha=0.7)' as action
-UNION ALL
-SELECT 
-    'rule_2',
-    'price_only',
-    'Query contains price, cost, market, trading, or crypto symbols (BTC, ETH, etc)',
-    'Call /api/prices with detected projects'
-UNION ALL
-SELECT 
-    'rule_3',
-    'combined',
-    'Query contains BOTH technical + price terms (e.g., "What is Bitcoin price AND consensus?")',
-    'Execute both rule_1 and rule_2, then combine results'
-UNION ALL
-SELECT 
-    'rule_4',
-    'adaptive',
-    'Query is ambiguous or mixed',
-    'Use adaptive alpha detection (0.5) and parallel fetch both KB and prices';
-
--- View the rules
-SELECT * FROM crypto_auditor_agent_rules;
+SELECT answer
+FROM crypto_auditor_agent
+WHERE question = 'What is Bitcoin proof of work consensus mechanism?';
 ```
 
-**Expected output:**
-```
-rule_1: kb_only → search KB
-rule_2: price_only → fetch prices
-rule_3: combined → both
-rule_4: adaptive → intelligent detection
-```
+**Expected output:** Detailed answer about PoW from the knowledge base
 
-**What this does:**
-- Defines the decision tree for your agent
-- Shows the logic it will use to route queries
-
----
-
-### STEP 8: Create Agent State Table
-
-This will track agent operations and decisions.
-
-**Run this in SQL Editor:**
+**Test 2: Another Technical Question**
 
 ```sql
--- Create a table to log agent operations
-CREATE TABLE IF NOT EXISTS agent_operations_log (
-    operation_id INT AUTO_INCREMENT PRIMARY KEY,
-    query_text TEXT,
-    detected_query_type VARCHAR(50),
-    kb_search_executed BOOLEAN,
-    price_fetch_executed BOOLEAN,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    results_combined BOOLEAN,
-    response_time_ms INT
-);
-
--- Verify table created
-SELECT * FROM agent_operations_log LIMIT 1;
+SELECT answer
+FROM crypto_auditor_agent
+WHERE question = 'Explain Ethereum smart contracts';
 ```
 
-**Expected output:**
-```
-(empty table, but successfully created)
-```
+**Expected output:** Technical explanation from whitepapers
 
-**What this does:**
-- Creates a log for agent decision tracking
-- Helps you understand agent behavior
-- Useful for debugging
-
----
-
-## 📊 Phase 4: Test Agent Logic
-
-### STEP 9: Test KB-Only Query Logic
-
-**Purpose:** Test the decision logic for KB-only queries
-
-**Run this in SQL Editor:**
+**Test 3: Price Question (should indicate no price data)**
 
 ```sql
--- Simulate KB-only query
--- User question: "What is Bitcoin's proof of work consensus?"
-
--- Step 1: Classify the query
-SELECT 
-    'What is Bitcoin proof of work consensus?' as input_query,
-    'kb_only' as classified_as,
-    'Contains protocol/technical terms' as reason;
-
--- Step 2: Show what would be returned from KB
-SELECT 
-    'Query type: kb_only' as agent_decision,
-    'Will execute hybrid search with alpha=0.7' as action,
-    'Search term: Bitcoin proof of work consensus' as kb_search_term;
-
--- Step 3: Actually execute the search
-SELECT 
-    content,
-    relevance,
-    metadata
-FROM web3_kb
-WHERE content LIKE '%Bitcoin%'
-    AND content LIKE '%proof%'
-    AND hybrid_search = true
-    AND hybrid_search_alpha = 0.7
-LIMIT 2;
+SELECT answer
+FROM crypto_auditor_agent
+WHERE question = 'What is the current price of Bitcoin?';
 ```
 
-**Expected output:**
-```
-Decision: kb_only
-Action: Hybrid search with alpha=0.7
-Results: 2 chunks from Bitcoin whitepaper with relevance scores
-```
+**Expected output:** Agent says it doesn't have live price data
+
+If all 3 tests work → ✅ **Agent is fully functional!**
 
 ---
 
-### STEP 10: Test Price-Only Query Logic
+## 🔧 Phase 2: Connect Price API (Advanced)
 
-**Purpose:** Test the decision logic for price-only queries
+**Option 1: MindsDB Skills (SQL-based - Recommended if you have HTTP skill support)**
 
-**Run this in SQL Editor:**
+MindsDB doesn't natively call external HTTP endpoints in agent queries. To call your `/api/prices` endpoint, you need to:
 
-```sql
--- Simulate price-only query
--- User question: "What is the current price of Bitcoin?"
+1. Create a custom ML handler/skill that calls HTTP endpoints, OR
+2. Use the Next.js backend to orchestrate (call MindsDB agent for KB, call price API directly)
 
--- Step 1: Classify
-SELECT 
-    'What is the current price of Bitcoin?' as input_query,
-    'price_only' as classified_as,
-    'Contains: price, current, cryptocurrency symbol' as reason;
+**We recommend Option 2** (Next.js orchestration) because:
+- Your `/app/api/agent/query/route.ts` already exists
+- It gives you full control over classification and combination
+- MindsDB agent handles KB queries (what it's best at)
+- Next.js handles price API and result merging
 
--- Step 2: Show what would happen
-SELECT 
-    'Query type: price_only' as agent_decision,
-    'Will call /api/prices endpoint' as action,
-    'Project detected: bitcoin' as price_project,
-    'API endpoint: http://localhost:3001/api/prices' as api_call;
-
--- Step 3: Show expected result format
-SELECT 
-    'bitcoin' as project,
-    45123.45 as price_usd,
-    892345000000 as market_cap_usd,
-    35678900000 as volume_24h_usd,
-    5.2 as price_change_24h,
-    12.8 as price_change_7d,
-    '2025-10-31T10:30:00Z' as last_updated;
+**Workflow:**
 ```
-
-**Expected output:**
-```
-Decision: price_only
-Action: Call /api/prices
-Expected: Price data returned in standardized format
-```
-
----
-
-### STEP 11: Test Combined Query Logic
-
-**Purpose:** Test the decision logic for combined queries
-
-**Run this in SQL Editor:**
-
-```sql
--- Simulate combined query
--- User question: "What is Bitcoin's consensus mechanism and current price?"
-
--- Step 1: Classify
-SELECT 
-    'What is Bitcoin consensus mechanism and current price?' as input_query,
-    'combined' as classified_as,
-    'Contains both: protocol terms (consensus) + market terms (price)' as reason;
-
--- Step 2: Show parallel execution plan
-SELECT 
-    'KB Search' as operation_1,
-    'Search for Bitcoin consensus' as operation_1_detail,
-    'Hybrid search alpha=0.7' as operation_1_params
-UNION ALL
-SELECT 
-    'Price Fetch' as operation_2,
-    'Fetch Bitcoin live data' as operation_2_detail,
-    'Call /api/prices with bitcoin' as operation_2_params;
-
--- Step 3: Show result combination strategy
-SELECT 
-    'KB Results' as result_section_1,
-    'Show protocol info, sources, relevance' as section_1_content
-UNION ALL
-SELECT 
-    'Price Results' as result_section_2,
-    'Show current price, 24h change, market cap' as section_2_content
-UNION ALL
-SELECT 
-    'Combined Insights' as result_section_3,
-    'Any analysis connecting protocol to market' as section_3_content;
-```
-
-**Expected output:**
-```
-Query Type: combined
-Execution: Parallel (both KB + prices)
-Result Format: Combined view with 3 sections
-```
-
----
-
-## 🔌 Phase 5: Integration with Frontend
-
-### STEP 12: Create Agent Endpoint Definition
-
-**Purpose:** Define how your frontend will call the agent
-
-This isn't a SQL command - it's documenting the API contract.
-
-**Create a new file in your project:**
-
-**File:** `/API_AGENT_CONTRACT.md`
-
-**Content:**
-
-```markdown
-# Crypto Auditor Agent - API Contract
-
-## Endpoint: POST /api/agent/query
-
-### Request
-```json
-{
-  "query": "What is Bitcoin's proof of work consensus and current price?",
-  "userId": "user_123",
-  "context": {
-    "searchMode": "auto",  // or "kb_only", "price_only", "combined"
-    "maxResults": 5,
-    "timeout": 10000
-  }
+User → Next.js /api/agent/query → {
+  1. Classify query (kb/price/both)
+  2. If KB needed: Query MindsDB agent via SQL
+  3. If price needed: Call /api/prices
+  4. Combine results
+  5. Return to user
 }
 ```
 
-### Response
-```json
-{
-  "queryId": "q_12345",
-  "classifiedAs": "combined",
-  "results": {
-    "kb_results": [
-      {
-        "content": "Bitcoin uses Proof of Work...",
-        "relevance": 0.89,
-        "source": "bitcoin_whitepaper.pdf",
-        "searchMode": "hybrid"
-      }
-    ],
-    "price_results": [
-      {
-        "project": "bitcoin",
-        "price_usd": 45123.45,
-        "market_cap_usd": 892345000000,
-        "price_change_24h": 5.2,
-        "last_updated": "2025-10-31T10:30:00Z"
-      }
-    ],
-    "executedAt": {
-      "kb_search_ms": 245,
-      "price_fetch_ms": 180,
-      "total_ms": 425
-    }
-  }
-}
-```
-
-### Agent Decision Logic
-- `combined`: KB search + price fetch (parallel)
-- `kb_only`: Knowledge base search only
-- `price_only`: Price API only
-- `auto`: Agent decides based on query content
-```
-
 ---
 
-## 🎯 Next: Backend Implementation
+## 🎯 Final Integration Steps
 
-### STEP 13: Create the Combined Agent API Route
+### Update Next.js Backend to Use MindsDB Agent
 
-This will be the Next.js endpoint that orchestrates everything.
+Modify `/app/api/agent/query/route.ts` to call the MindsDB agent instead of directly querying KB:
 
-**You'll create:** `/app/api/agent/query/route.ts`
+**Change this function:**
 
 ```typescript
-// This will combine:
-// 1. KB search logic (existing)
-// 2. Price fetch logic (existing)
-// 3. Query classification (from agent rules)
-// 4. Result combination
-// 5. Response formatting
+// OLD: Direct KB query
+async function executeKBSearch(query: string) {
+  const response = await fetch('http://127.0.0.1:47335/api/sql', {
+    method: 'POST',
+    body: JSON.stringify({
+      query: `SELECT content, relevance, metadata FROM web3_kb WHERE...`
+    })
+  });
+  // ...
+}
+```
+
+**To this:**
+
+```typescript
+// NEW: Query MindsDB agent
+async function executeKBSearch(query: string) {
+  const response = await fetch('http://127.0.0.1:47335/api/sql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: `
+        SELECT answer
+        FROM crypto_auditor_agent
+        WHERE question = '${query.replace(/'/g, "''")}';
+      `
+    })
+  });
+  
+  if (!response.ok) {
+    throw new Error(`MindsDB agent query failed: ${response.statusText}`);
+  }
+  
+  const data = await response.json();
+  const answer = data.data?.[0]?.answer || '';
+  
+  // Parse answer into structured KB results if needed
+  // Or return raw answer text
+  return {
+    results: [{ content: answer, relevance: 1.0, source: 'MindsDB Agent' }],
+    duration: Date.now() - startTime
+  };
+}
 ```
 
 ---
 
-## 📋 Quick Reference: Agent SQL Commands Cheat Sheet
+## ✅ Complete Setup Checklist
+
+- [ ] MindsDB running at `http://127.0.0.1:47334`
+- [ ] KB verified with `SELECT COUNT(*) FROM web3_kb`
+- [ ] KB queries work (test with metadata/relevance SELECT)
+- [ ] MindsDB agent created (`CREATE AGENT crypto_auditor_agent`)
+- [ ] Agent responds to queries (`SELECT answer FROM crypto_auditor_agent WHERE...`)
+- [ ] Next.js dev server running (check port with `npm run dev` output)
+- [ ] Price API working (`/api/prices`)
+- [ ] Backend updated to call MindsDB agent
+- [ ] Frontend tested end-to-end
+
+---
+
+## 🧪 Testing Commands
+
+### Test MindsDB Agent (in MindsDB SQL Editor)
 
 ```sql
--- Check agent rules
-SELECT * FROM crypto_auditor_agent_rules;
+-- Test 1: Technical query
+SELECT answer
+FROM crypto_auditor_agent
+WHERE question = 'Explain Bitcoin proof of work';
 
--- View agent operations log
-SELECT * FROM agent_operations_log ORDER BY timestamp DESC LIMIT 10;
+-- Test 2: Another protocol
+SELECT answer
+FROM crypto_auditor_agent
+WHERE question = 'What is Ethereum consensus?';
+```
 
--- Simulate KB search
-SELECT * FROM web3_kb 
-WHERE hybrid_search = true 
-LIMIT 3;
+### Test Next.js Backend (in PowerShell - update port if needed)
 
--- Check price API availability
-SELECT * FROM price_api_handler;
+```powershell
+# Check which port Next.js is running on first
+# Look for "Local: http://localhost:XXXX" in npm run dev output
 
--- View recent agent decisions
-SELECT 
-    query_text,
-    detected_query_type,
-    kb_search_executed,
-    price_fetch_executed,
-    results_combined
-FROM agent_operations_log 
-ORDER BY timestamp DESC 
-LIMIT 5;
+# Then test (replace 3000 with actual port):
+Invoke-RestMethod -Uri "http://localhost:3000/api/agent/query" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"query":"What is Bitcoin consensus?"}'
+```
+
+### Test Price API
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/api/prices" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"projects":["bitcoin","ethereum"]}'
 ```
 
 ---
 
-## ✅ Verification Checklist
+## 💡 Troubleshooting
 
-- [ ] MindsDB SQL Editor accessible at `http://127.0.0.1:47334`
-- [ ] Can query `web3_kb` table (Step 2)
-- [ ] Hybrid search works (Step 3)
-- [ ] `crypto_auditor_agent_rules` view created (Step 7)
-- [ ] `agent_operations_log` table created (Step 8)
-- [ ] All test queries run successfully (Steps 9-11)
-- [ ] API contract documented (Step 12)
-- [ ] Ready to implement `/api/agent/query/route.ts` (Step 13)
+### "Failed to connect to localhost:3001"
+**Solution:** Check actual port from `npm run dev` output. Next.js often uses 3000, 3001, 3002 depending on availability.
 
----
+### "Agent not found"
+**Solution:** Run `SHOW AGENTS;` to see if agent was created. If not, re-run `CREATE AGENT` command.
 
-## 🚀 Next Steps
+### "KB query returns empty"
+**Solution:** Don't select `content` column. Use only `metadata` and `relevance` due to DuckDB limitations.
 
-1. ✅ Run Steps 1-12 above in MindsDB SQL Editor
-2. 📝 Document any issues or unexpected results
-3. 🔧 We'll build `/api/agent/query/route.ts` next
-4. 🧪 Test with your Next.js frontend
-5. 📊 Monitor agent logs and optimize
+### "API key error"
+**Solution:** Replace `YOUR_GOOGLE_API_KEY_HERE` with actual Google API key in the `CREATE AGENT` command.
 
 ---
 
-## 💡 Tips & Troubleshooting
+## 📞 Quick Reference
 
-### If you get "table not found" error
-```sql
--- Check what tables exist
-SELECT table_name FROM information_schema.tables 
-WHERE table_schema = 'mindsdb';
-```
+**MindsDB SQL Endpoint:** `http://127.0.0.1:47335/api/sql`
+**MindsDB UI:** `http://127.0.0.1:47334`
+**Next.js Backend:** `http://localhost:PORT` (check npm run dev output)
 
-### If hybrid search doesn't work
+**Key SQL Commands:**
 ```sql
--- Verify hybrid search is supported
-SELECT * FROM web3_kb WHERE hybrid_search = true LIMIT 1;
-```
+-- Create agent
+CREATE AGENT crypto_auditor_agent USING model = {...}, data = {...};
 
-### If price handler fails
-```sql
--- Check the view was created
-SELECT * FROM price_api_handler;
-```
+-- Query agent  
+SELECT answer FROM crypto_auditor_agent WHERE question = '...';
 
-### To clear agent logs
-```sql
--- Delete old operations
-DELETE FROM agent_operations_log 
-WHERE timestamp < DATE_SUB(NOW(), INTERVAL 1 DAY);
+-- List agents
+SHOW AGENTS;
+
+-- Delete agent (if need to recreate)
+DROP AGENT crypto_auditor_agent;
 ```
 
 ---
 
-## 📞 Questions?
+## 🎉 You're Done!
 
-Each step is designed to be independent. You can:
-- Run them one at a time
-- Test each step before moving forward
-- Go back and modify if needed
+Once all checklist items pass, you have:
+- ✅ MindsDB agent querying your knowledge base
+- ✅ Next.js backend combining KB + price data
+- ✅ Smart classification routing queries appropriately
+- ✅ Full agent system ready for frontend integration
 
-Let me know which step you're on and any issues you encounter! 🎯
+**Next step:** Update your frontend (`/app/page.tsx`) to use the unified `/api/agent/query` endpoint!

@@ -196,54 +196,59 @@ async function executeKBSearch(
   const startTime = Date.now();
 
   try {
-    // Determine adaptive alpha based on query type
-    const adaptive = classifyQuery(query);
-    let alpha = 0.7; // default
-    if (adaptive.type === 'price_only') alpha = 0.3;
-    else if (adaptive.type === 'combined') alpha = 0.5;
-
+    // Use MindsDB Agent instead of direct KB query
+    console.log(`[KB Search] Querying MindsDB agent with: "${query}"`);
+    
     const response = await fetch('http://127.0.0.1:47335/api/sql', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: `
-          SELECT 
-            content,
-            relevance,
-            metadata
-          FROM web3_kb
-          WHERE content LIKE '%${query.split(/\s+/).slice(0, 3).join('%')}%'
-            AND hybrid_search = true
-            AND hybrid_search_alpha = ${alpha}
-          ORDER BY relevance DESC
-          LIMIT ${maxResults};
+          SELECT answer
+          FROM crypto_auditor_agent
+          WHERE question = '${query.replace(/'/g, "''")}';
         `,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`MindsDB query failed: ${response.statusText}`);
+      throw new Error(`MindsDB agent query failed: ${response.statusText}`);
     }
 
     const data = await response.json();
-    const results: KBResult[] = (data.data || []).map((row: any) => ({
-      content: row.content || '',
-      relevance:
-        typeof row.relevance === 'string'
-          ? parseFloat(row.relevance)
-          : row.relevance,
-      metadata:
-        typeof row.metadata === 'string'
-          ? JSON.parse(row.metadata)
-          : row.metadata,
-      source: row.metadata?._source || 'Unknown Source',
-      searchMode: alpha === 0.7 ? 'semantic' : alpha === 0.3 ? 'keyword' : 'hybrid',
-    }));
+    console.log(`[KB Search] MindsDB raw response:`, JSON.stringify(data, null, 2));
+    
+    // Check if we got data
+    if (!data.data || data.data.length === 0) {
+      console.warn(`[KB Search] No data in response from MindsDB agent`);
+      return { results: [], duration: Date.now() - startTime };
+    }
+    
+    const answer = data.data?.[0]?.answer || '';
+    console.log(`[KB Search] Agent answer length: ${answer.length} chars`);
+    
+    if (!answer) {
+      console.warn(`[KB Search] Answer field is empty`);
+      return { results: [], duration: Date.now() - startTime };
+    }
+
+    // Convert agent's answer into KB result format
+    const results: KBResult[] = [{
+      content: answer,
+      relevance: 1.0,
+      metadata: {
+        _source: 'MindsDB Agent',
+        category: 'agent_response'
+      },
+      source: 'MindsDB Agent',
+      searchMode: 'agent',
+    }];
 
     const duration = Date.now() - startTime;
+    console.log(`[KB Search] Agent responded in ${duration}ms`);
     return { results, duration };
   } catch (error) {
-    console.error('KB Search Error:', error);
+    console.error('[KB Search Error]:', error);
     return { results: [], duration: Date.now() - startTime };
   }
 }

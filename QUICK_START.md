@@ -61,7 +61,7 @@ USING
     model = {
         "provider": "google",
         "model_name": "gemini-2.0-flash",
-        "api_key": "YOUR_GOOGLE_API_KEY_HERE"
+        "api_key": "AIzaSyBTRdxDRy5ii22Gc7iykczL013nOpYwwJM"
     },
     data = {
         "knowledge_bases": ["mindsdb.web3_kb"]

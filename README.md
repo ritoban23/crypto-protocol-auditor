@@ -1,4 +1,6 @@
-# 🔐 Crypto Protocol Auditor
+![Crypto Protocol Auditor Logo](./assets/logo.png)
+
+# Crypto Protocol Auditor
 
 The Web3 world is exploding. New protocols launch daily, each with a dense, complex, and often boring whitepaper. For an investor, developer, or enthusiast, trying to find the right sources, understand technical consensus mechanisms, and track market changes is a disconnected nightmare of tabs and data silos. The Crypto Protocol Auditor solves this. It's an AI-powered auditor, built on MindsDB, that unifies this scattered data into one conversational interface. You can instantly feed the system unstructured data like PDF whitepapers and structured data like project info from your database. Immediately, you can ask natural language questions to get simple answers from complex documents, compare the technical specs of multiple protocols side-by-side, and—most powerfully—get a real-time, 360-degree view by asking for live price activity from CoinGecko and current market sentiment from live news articles, all in one place.
 
@@ -52,7 +54,7 @@ The Web3 world is exploding. New protocols launch daily, each with a dense, comp
 
 ## 🏗️ System Architecture
 
-![Crypto Protocol Auditor Architecture](./crypto_auditor_architecture.jpg)
+![Crypto Protocol Auditor Architecture](./assets/crypto_auditor_architecture.jpg)
 
 ### Architecture Overview
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 // Agent API Response types
 type SearchResult = {
@@ -236,7 +237,13 @@ export default function Home() {
         <div className="max-w-[1200px] mx-auto px-12 md:px-6">
           <div className="flex items-center justify-between h-[72px]">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">🔐</span>
+              <Image 
+                src="/logo.png" 
+                alt="Crypto Protocol Auditor Logo" 
+                width={80} 
+                height={80}
+                className="rounded"
+              />
               <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                 Crypto Protocol Auditor
               </h1>
@@ -574,7 +581,7 @@ export default function Home() {
             <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
               <div className="p-6 rounded-2xl border text-left transition-medium hover:shadow-elevated" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }}>
                 <p className="text-sm font-semibold mb-3" style={{ color: 'var(--color-primary)' }}>
-                  � Sentiment Badges
+                  📊 Sentiment Badges
                 </p>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                   See protocol-level sentiment summaries (bullish / bearish / neutral) aggregated from recent news.
@@ -582,7 +589,7 @@ export default function Home() {
               </div>
               <div className="p-6 rounded-2xl border text-left transition-medium hover:shadow-elevated" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }}>
                 <p className="text-sm font-semibold mb-3" style={{ color: 'var(--color-info)' }}>
-                  � Recent News
+                  📰 Recent News
                 </p>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                   Quick access to the latest headlines and sources used to compute sentiment.

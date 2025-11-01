@@ -1,29 +1,27 @@
 # 🔐 Crypto Protocol Auditor
 
-**AI-Powered Cryptocurrency Intelligence Platform**  
-Built with Next.js, MindsDB, and modern fintech design.
+The Web3 world is exploding. New protocols launch daily, each with a dense, complex, and often boring whitepaper. For an investor, developer, or enthusiast, trying to find the right sources, understand technical consensus mechanisms, and track market changes is a disconnected nightmare of tabs and data silos. The Crypto Protocol Auditor solves this. It's an AI-powered auditor, built on MindsDB, that unifies this scattered data into one conversational interface. You can instantly feed the system unstructured data like PDF whitepapers and structured data like project info from your database. Immediately, you can ask natural language questions to get simple answers from complex documents, compare the technical specs of multiple protocols side-by-side, and—most powerfully—get a real-time, 360-degree view by asking for live price activity from CoinGecko and current market sentiment from live news articles, all in one place.
 
 ---
 
-## 📚 Documentation Quick Links
+## 📚 Documentation
 
-- **[QUICK_START.md](./QUICK_START.md)** - Get running in 5 minutes
-- **[KB_EVALUATION.md](./KB_EVALUATION.md)** - KB metrics & evaluation tools
-- **[ROADMAP.md](./ROADMAP.md)** - Feature roadmap & future plans
+- **[KB_EVALUATION.md](./KB_EVALUATION.md)** - Knowledge base evaluation & metrics
+- **[ROADMAP.md](./ROADMAP.md)** - Feature roadmap & development plan
 
 ---
 
 ## 🎯 What It Does
 
 **Hybrid Search** combines knowledge base, live prices, and sentiment analysis in one query:
-- 📚 **Knowledge Base**: 1300+ characters of technical protocol information
-- 💰 **Live Prices**: Real-time CoinGecko data (price, market cap, 24h change)
-- 📈 **Sentiment Analysis**: Market mood (bullish/bearish/neutral) from latest news
+- 📚 **Knowledge Base**: Provide as much documents and cryptocurrency data as you want
+- 💰 **Live Prices**: Real-time market data (price, market cap, 24h change)
+- 📈 **Sentiment Analysis**: Market mood (bullish/bearish/neutral) from latest news and link to the most relevant sources/articles
 - 🔀 **Protocol Comparison**: Side-by-side analysis of 2-5 protocols
 
 ---
 
-## ✨ Features (Phase 3a - Complete)
+## ✨ Features
 
 ✅ **AI-Powered Search**
 - Hybrid search: semantic + keyword combining
@@ -31,27 +29,24 @@ Built with Next.js, MindsDB, and modern fintech design.
 - Query timing metrics (KB ms, price ms, total ms)
 
 ✅ **Real-Time Market Data**
-- Live prices via CoinGecko API (40+ cryptos)
+- Live prices (configurable source, e.g., CoinGecko)
 - Market cap, volume, 24h/7d price changes
-- 5-minute cache for performance
+- Intelligent caching for performance
 
 ✅ **Sentiment & News Intelligence**
-- AI sentiment analysis (Gemini) on latest news
+- AI sentiment analysis (configurable LLM)
 - Recent articles with sources and dates
 - Bullish/bearish/neutral confidence scores
-- 1-hour sentiment caching
 
 ✅ **Protocol Comparison**
 - Compare 2-5 protocols side-by-side
 - Combined technical info + live prices + sentiment
-- Comparison summaries from AI
+- AI-generated comparison summaries
 
 ✅ **Modern UI**
-- **Dark theme** with fintech design tokens
-- **Gruppo font** for all typography
-- **Sentiment badges** (🟢 bullish, 🔴 bearish, 🟡 neutral)
-- **Responsive cards** for desktop & mobile
-- **Loading states** and error handling
+- Dark theme with fintech design tokens
+- Responsive cards for desktop & mobile
+- Loading states and error handling
 
 ---
 
@@ -62,8 +57,8 @@ Built with Next.js, MindsDB, and modern fintech design.
 ### Architecture Overview
 
 **Zone 1: Frontend (User Layer)**
-- Next.js + React 19 with TypeScript
-- Dark theme with Gruppo typography
+- Next.js + React with TypeScript
+- Dark theme UI (responsive)
 - Real-time search, comparison, and sentiment displays
 
 **Zone 2: Backend (API Routes)**
@@ -74,17 +69,16 @@ Built with Next.js, MindsDB, and modern fintech design.
 - `/api/search` - Direct KB search
 
 **Zone 3: MindsDB (AI Brain)**
-- `crypto_auditor_agent` - Main intelligence engine (Gemini LLM)
-- `web3_kb` - Knowledge base (112+ documents, 40+ cryptos)
-- `crypto_news` - News database for sentiment
-- Vector embeddings via PGVector
+- Agent engine (connects to your LLM provider)
+- Knowledge base (112+ documents via PGVector embeddings)
+- News database for sentiment analysis
+- Multi-source data integration
 
 **Zone 4: Data Layer**
-- **PGVector DB** - Stores KB embeddings
-- **Neon Postgres** - Project metadata
-- **CoinGecko API** - Live prices
-- **News API** - Market sentiment data
-- **LLM API** - Gemini for response synthesis
+- Vector database (PGVector embeddings)
+- Price source (e.g., CoinGecko, Binance)
+- News source (e.g., NewsAPI)
+- Metadata storage (e.g., Neon Postgres)
 
 ---
 
@@ -94,210 +88,129 @@ Built with Next.js, MindsDB, and modern fintech design.
 crypto-protocol-auditor/
 ├── crypto-auditor-app/           # Next.js frontend + API routes
 │   ├── app/
-│   │   ├── page.tsx              # Main search UI (dark theme, Gruppo font)
-│   │   ├── layout.tsx            # Root layout with Gruppo import
-│   │   ├── globals.css           # Global styles (dark variables, fonts)
+│   │   ├── page.tsx              # Main search UI
+│   │   ├── layout.tsx            # Root layout
+│   │   ├── globals.css           # Global styles
 │   │   ├── compare/
 │   │   │   └── page.tsx          # Protocol comparison page
 │   │   └── api/
 │   │       ├── agent/query       # Hybrid search orchestration
-│   │       ├── prices/           # Live CoinGecko prices
-│   │       ├── sentiment/        # News + sentiment analysis
-│   │       ├── compare/          # Protocol comparison
-│   │       └── search/           # MindsDB KB search
+│   │       ├── prices/           # Live prices endpoint
+│   │       ├── sentiment/        # Sentiment analysis endpoint
+│   │       ├── compare/          # Protocol comparison endpoint
+│   │       └── search/           # Direct KB search endpoint
 │   └── package.json
 ├── docker-compose.yml             # MindsDB + PGVector services
 ├── crypto_auditor_architecture.jpg # System architecture diagram
-├── kb_evaluate.py                 # Basic KB evaluation tool
-├── advanced_kb_evaluate.py        # Advanced KB evaluation (MRR, NDCG, etc)
-├── KB_EVALUATION.sql              # MindsDB test queries
-├── QUICK_START.md                 # Setup instructions (5 min)
-├── KB_EVALUATION.md               # KB metrics & evaluation guide
-└── ROADMAP.md                    # Feature roadmap
+├── kb_evaluate.py                 # KB evaluation tool
+├── advanced_kb_evaluate.py        # Advanced metrics tool
+├── KB_EVALUATION.md               # KB evaluation guide
+├── ROADMAP.md                    # Feature roadmap
+└── .env.example                  # Environment variables template
 ```
 
 ---
 
-## 🏗️ Architecture
-
-## 🚀 Quick Start
+## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+
-- Docker & Docker Compose
-- News API key (get free at [newsapi.org](https://newsapi.org))
 
-### Setup (5 minutes)
+- **Node.js** 18+
+- **Docker** & **Docker Compose**
+- **Basic MindsDB knowledge** - Familiarity with MindsDB agents and databases recommended
+- **API Keys** (get free from your chosen providers):
+  - LLM provider (e.g., Google Gemini, OpenAI, Anthropic)
 
-**1. Clone & Install**
+### Quick Setup
+
+1. **Clone the repository**
 ```bash
 git clone https://github.com/ritoban23/crypto-protocol-auditor.git
+cd crypto-protocol-auditor
+```
+
+2. **Configure environment variables**
+```bash
+cp .env.example .env
+# Edit .env with YOUR API keys
+```
+
+3. **Install dependencies**
+```bash
 cd crypto-auditor-app
 npm install
+cd ..
 ```
 
-**2. Start Infrastructure**
+4. **Start services**
 ```bash
-cd ..
 docker-compose up -d
 ```
-This starts:
-- MindsDB (port 47334)
-- PGVector database (port 5432)
 
-**3. Configure Environment**
-
-Create `.env.local` in `crypto-auditor-app/`:
-```env
-NEXT_PUBLIC_API_BASE=http://localhost:3000
-NEWS_API_KEY=your_key_here
-MINDSDB_HOST=127.0.0.1
-MINDSDB_PORT=47334
-```
-
-**4. Run Development Server**
+5. **Run the application**
 ```bash
 cd crypto-auditor-app
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) ✅
+Visit http://localhost:3000
 
 ---
 
 ## 📊 API Reference
 
-### Search Hybrid Results
+### Main Query Endpoint
 **POST** `/api/agent/query`
+
+Combines KB search, prices, and sentiment:
 ```json
 {
-  "query": "What is Bitcoin and its current price?",
-  "context": { "searchMode": "auto", "maxResults": 5 }
+  "query": "Tell me about Bitcoin"
 }
 ```
 
-**Response**:
-```json
-{
-  "queryId": "uuid",
-  "classifiedAs": "combined",
-  "results": {
-    "kb_results": [{ "content": "...", "relevance": 0.95 }],
-    "price_results": [{ "project": "bitcoin", "price_usd": 109717, ... }]
-  },
-  "executedAt": { "kb_search_ms": 354, "price_fetch_ms": 66, "total_ms": 367 }
-}
-```
+Response includes technical content, market data, and sentiment.
 
-### Get Sentiment Analysis
-**GET** `/api/sentiment?project=bitcoin&days=7`
-
-**Response**:
-```json
-{
-  "sentiment": "bullish",
-  "score": 0.78,
-  "confidence": 0.92,
-  "summary": "...",
-  "newsCount": 42,
-  "recentNews": [{ "title": "...", "url": "...", "publishedAt": "..." }]
-}
-```
-
-### Get Live Prices
-**POST** `/api/prices`
-```json
-{ "projects": ["bitcoin", "ethereum"] }
-```
-
-### Compare Protocols
-**GET** `/api/compare?projects=bitcoin,ethereum,ripple`
+### Other Endpoints
+- **GET** `/api/sentiment?project={name}` - Market sentiment analysis
+- **POST** `/api/compare` - Compare multiple protocols
+- **GET** `/api/prices?projects={list}` - Live pricing data
+- **GET** `/api/search?q={query}` - Direct knowledge base search
 
 ---
 
-## 🎨 Design System
+## ⚙️ Configuration
 
-**Colors** (Dark Mode):
-- Primary: `#6C5CE7` (purple)
-- Success: `#00D084` (green)
-- Error: `#FF3B30` (red)
-- Info: `#0A84FF` (blue)
-- Backgrounds: `#0F1419`, `#1A1F26` (dark surfaces)
+Customize for your setup:
 
-**Typography**:
-- All text: **Gruppo** (display font)
-- Imported from Google Fonts
+- **LLM Provider**: Configure in MindsDB (Gemini, OpenAI, etc.)
+- **Price Source**: Change API provider (CoinGecko, Binance, etc.)
+- **News Source**: Update news API (NewsAPI, etc.)
+- **Knowledge Base**: Add/modify documents in MindsDB
+- **UI Styling**: Modify CSS variables in `globals.css`
 
 ---
 
-## 📈 Performance Metrics
+## 📈 Performance
 
-| Operation | Time | Notes |
-|-----------|------|-------|
-| KB search | 200-500ms | Semantic + keyword hybrid |
-| Price fetch | 50-900ms | CoinGecko API |
-| Sentiment (first) | 2-5s | API + AI analysis |
-| Sentiment (cached) | <100ms | 1-hour TTL |
-| Combined query | 8-16s | KB + prices parallel |
-
----
-
-## 🔄 Current Status
-
-**Phase 3a Complete** ✅
-- Dark theme UI finalized
-- Gruppo font applied globally
-- Sentiment badges integrated
-- Recent news section added
-- All 40+ crypto protocols supported
-
-**Next**: Phase 3b improvements (autocomplete, query history, mobile UX)
-
----
-
-## 📝 Environment Variables
-
-```env
-# Next.js / Client
-NEXT_PUBLIC_API_BASE=http://localhost:3000
-
-# APIs
-NEWS_API_KEY=your_newsapi_key_here
-
-# MindsDB
-MINDSDB_HOST=127.0.0.1
-MINDSDB_PORT=47334
-
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/crypto_kb
-
-# Optional
-DEBUG=false
-```
+| Operation | Time | Details |
+|-----------|------|---------|
+| KB search | 200-500ms | Semantic + keyword |
+| Price fetch | 50-900ms | Depends on external API |
+| Sentiment (first) | 2-5s | News + AI analysis |
+| Sentiment (cached) | <100ms | Configurable TTL |
+| Combined query | 8-16s | Parallel execution |
 
 ---
 
 ## 🤝 Contributing
 
-1. Create a feature branch: `git checkout -b feature/my-feature`
-2. Commit changes: `git commit -am 'Add feature'`
-3. Push to remote: `git push origin feature/my-feature`
-4. Open a pull request
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Commit changes: `git commit -m 'Add feature'`
+4. Push: `git push origin feature/my-feature`
+5. Open a pull request
 
 ---
 
-## 📄 License
 
-MIT License - see LICENSE file for details
-
----
-
-## 📞 Support
-
-- Issues: GitHub Issues
-- Docs: See `QUICK_START.md` and `ROADMAP.md`
-- MindsDB Setup: `QUICK_START.md` Step 2
-
----
-
-**Last Updated**: October 31, 2025 | Phase 3a UI Complete

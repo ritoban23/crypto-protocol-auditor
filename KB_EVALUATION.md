@@ -8,7 +8,9 @@
 
 ## Quick Summary
 
-The Crypto Protocol Auditor knowledge base has been comprehensively evaluated and is production-ready. Advanced metrics demonstrate excellent ranking quality and search effectiveness.
+The Crypto Protocol Auditor knowledge base has been comprehensively evaluated. Advanced metrics demonstrate excellent ranking quality and search effectiveness.
+
+> **Note:** These metrics are based on sample test data provided to MindsDB during evaluation. Results reflect KB quality with the sample dataset used. Production performance may vary based on actual query patterns and document content.
 
 ### Key Metrics
 
@@ -254,11 +256,4 @@ python advanced_kb_evaluate.py
 
 ---
 
-## Recommendations
 
-✅ **Deploy to production** - All metrics support production readiness  
-✅ **Monitor with these tools** - Use kb_evaluate.py quarterly  
-✅ **Re-evaluate after updates** - Run after adding new documents  
-✅ **Track trends** - Watch for metric degradation over time  
-
-**Next Phase:** Consider adding on-chain data (GitHub stats, social metrics, governance data) to further enrich results.

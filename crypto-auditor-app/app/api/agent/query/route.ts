@@ -276,11 +276,76 @@ async function executeKBSearch(
           console.log(`[KB Search] Direct KB query returned ${directData.data?.length || 0} chunks`);
           
           if (directData.data && directData.data.length > 0) {
-            // Combine chunks into a single comprehensive answer
+            // Combine chunks from direct KB query
             const chunks = directData.data.map((row: any) => row[0]).filter((c: string) => c && c.length > 50);
             
             if (chunks.length > 0) {
-              // Combine first few chunks to create a comprehensive answer
+              console.log(`[KB Search] Found ${chunks.length} chunks, synthesizing with agent...`);
+              
+              // Combine chunks for agent synthesis
+              const combinedKBContent = chunks.slice(0, 5).join('\n\n---\n\n').substring(0, 3000);
+              const project = detectedProjects[0] || 'the protocol';
+              
+              // Use agent to synthesize
+              const synthesisQuery = `Based on the following information from the knowledge base, answer this question: "${query}"
+
+Knowledge Base Information:
+${combinedKBContent}
+
+Instructions:
+- Synthesize this information into a clear, well-structured answer
+- Focus on what the user asked about
+- Write 2-4 concise paragraphs
+- Do NOT include metadata, Git commits, PDF headers, page numbers, or disclosure statements
+- Explain technical concepts clearly
+
+Your synthesized answer:`;
+
+              try {
+                const agentResponse = await fetch('http://127.0.0.1:47334/api/sql/query', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    query: `SELECT answer FROM crypto_auditor_agent WHERE question = '${synthesisQuery.replace(/'/g, "''")}'`
+                  }),
+                });
+
+                if (agentResponse.ok) {
+                  const agentData = await agentResponse.json();
+                  let synthesizedAnswer = '';
+                  
+                  if (agentData.data && agentData.data.length > 0) {
+                    if (Array.isArray(agentData.data[0])) {
+                      synthesizedAnswer = agentData.data[0][0] || '';
+                    } else {
+                      synthesizedAnswer = String(agentData.data[0]) || '';
+                    }
+                  }
+                  
+                  if (synthesizedAnswer && synthesizedAnswer.length > 100 && !synthesizedAnswer.includes('tool_code')) {
+                    const duration = Date.now() - startTime;
+                    console.log(`[KB Search] Agent synthesized answer (${synthesizedAnswer.length} chars) in ${duration}ms`);
+                    
+                    return {
+                      results: [{
+                        content: synthesizedAnswer,
+                        relevance: 1.0,
+                        metadata: {
+                          _source: 'MindsDB Agent (Synthesized)',
+                          category: directData.data[0][2] || 'document',
+                        },
+                        source: 'Knowledge Base (Synthesized)',
+                        searchMode: 'synthesized',
+                      }],
+                      duration
+                    };
+                  }
+                }
+              } catch (agentError) {
+                console.warn(`[KB Search] Agent synthesis failed, using raw chunks:`, agentError);
+              }
+              
+              // Fallback: return raw chunks if agent fails
               const combinedContent = chunks.slice(0, 3).join('\n\n');
               const duration = Date.now() - startTime;
               
@@ -327,25 +392,57 @@ async function executeKBSearch(
       project = projectMatch ? projectMatch[1].trim() : 'the project';
     }
     
-    const enhancedQuery = `Provide comprehensive and detailed technical information about ${project} specifically.
-
-IMPORTANT: Search the knowledge base for information about ${project} (not other projects).
-
-Include ALL available information for ${project}:
-1. Complete technical description and purpose
-2. Technical architecture and system design
-3. Consensus mechanism and validation process
-4. Fee structure, tokenomics, and economic model
-5. Key features and innovations
-6. Security model and considerations
-
-Be comprehensive:`;
+    // New approach: Query KB directly, then use agent to synthesize
+    console.log(`[KB Search] Step 1: Querying KB directly for ${project}`);
     
+    // Query KB directly to get raw documents (case-insensitive search)
+    const searchTerm = project.toLowerCase();
+    const kbResponse = await fetch('http://127.0.0.1:47334/api/sql/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `SELECT content FROM web3_kb WHERE LOWER(content) LIKE '%${searchTerm}%' LIMIT 5;`
+      }),
+    });
+
+    if (!kbResponse.ok) {
+      console.error(`[KB Search] KB query failed`);
+      return { results: [], duration: Date.now() - startTime };
+    }
+
+    const kbData = await kbResponse.json();
+    
+    if (!kbData.data || kbData.data.length === 0) {
+      console.warn(`[KB Search] No KB documents found for ${project}`);
+      return { results: [], duration: Date.now() - startTime };
+    }
+
+    // Extract content from KB results
+    const kbDocuments = kbData.data.map((row: any) => row[0] || '').filter((c: string) => c.length > 0);
+    const combinedKBContent = kbDocuments.join('\n\n---\n\n').substring(0, 3000); // Limit to 3000 chars
+    
+    console.log(`[KB Search] Step 2: Found ${kbDocuments.length} documents, synthesizing with agent`);
+    
+    // Now use agent to synthesize the KB content
+    const synthesisQuery = `Based on the following information from the knowledge base about ${project}, ${technicalQuery}
+
+Knowledge Base Information:
+${combinedKBContent}
+
+Instructions:
+- Synthesize this information into a clear, well-structured answer
+- Focus on what the user asked about
+- Write 2-4 concise paragraphs
+- Do NOT include metadata, Git commits, PDF headers, or disclosure statements
+- Explain technical concepts clearly
+
+Your synthesized answer:`;
+
     const response = await fetch('http://127.0.0.1:47334/api/sql/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        query: `SELECT answer FROM crypto_auditor_agent WHERE question = '${enhancedQuery.replace(/'/g, "''")}'`
+        query: `SELECT answer FROM crypto_auditor_agent WHERE question = '${synthesisQuery.replace(/'/g, "''")}'`
       }),
     });
 

@@ -85,6 +85,35 @@ function extractProjectName(content: string): string | null {
 }
 
 /**
+ * Clean KB result content by removing Git commits, metadata, and excessive whitespace
+ */
+function cleanKBContent(content: string): string {
+  if (!content) return '';
+  
+  // Remove Git commit hashes (40 hex chars after "Git Commit:")
+  let cleaned = content.replace(/Git Commit:\s*[a-f0-9]{40}/gi, '');
+  
+  // Remove Disclosure lines (multiline compatible)
+  cleaned = cleaned.replace(/Disclosure:[\s\S]*?(?=\n\n|\n[A-Z]|$)/g, '');
+  
+  // Remove Abstract: labels
+  cleaned = cleaned.replace(/^Abstract\.\s*/gim, '');
+  
+  // Remove excessive newlines (more than 2 in a row)
+  cleaned = cleaned.replace(/\n\n\n+/g, '\n\n');
+  
+  // Remove leading/trailing whitespace
+  cleaned = cleaned.trim();
+  
+  // Truncate very long content to first 1000 chars for KB display (increased from 500)
+  if (cleaned.length > 1000) {
+    cleaned = cleaned.substring(0, 1000).trim() + '...';
+  }
+  
+  return cleaned;
+}
+
+/**
  * Sentiment Badge Component
  */
 function SentimentBadge({ sentiment, score, confidence }: { sentiment: string; score: number; confidence: number }) {
@@ -415,7 +444,7 @@ export default function Home() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-4 flex-wrap">
                           <h4 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
-                            AI Response
+                            Response
                           </h4>
                           {sentiment && (
                             <SentimentBadge
@@ -426,7 +455,7 @@ export default function Home() {
                           )}
                         </div>
                         <p className="text-base leading-7 whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
-                          {result.content}
+                          {cleanKBContent(result.content)}
                         </p>
                       </div>
                     </div>

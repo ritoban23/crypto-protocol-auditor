@@ -6,6 +6,14 @@ The Web3 world is exploding. New protocols launch daily, each with a dense, comp
 
 ---
 
+## 🎬 Demo / How It Works
+
+Watch the demo video to see the Crypto Protocol Auditor in action:
+
+[![Demo Video](https://img.youtube.com/vi/lFmfGMTv0Uw/0.jpg)](https://www.youtube.com/watch?v=lFmfGMTv0Uw)
+
+---
+
 ## 📚 Documentation
 
 - **[KB_EVALUATION.md](./KB_EVALUATION.md)** - Knowledge base evaluation & metrics
